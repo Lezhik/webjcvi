@@ -1,0 +1,8 @@
+spring:
+  ai:
+    mcp:
+      server:
+        enabled: false
+gg:
+  jte:
+    development-mode: true

@@ -43,6 +43,7 @@ emerge from the iteration loop itself.
 │   └── log.md             append-only iteration decision log
 ├── build/
 │   └── reports/           generated DNA/code reports (git-ignored, regenerated per iteration)
+│       └── dna/           DNA decoder output (`dna-report.md`)
 ├── src/
 │   └── main/java/...      application code (dna / report / storage / web / mcp packages)
 ├── AGENTS.md              operating instructions for AI coding agents working in this repo
@@ -81,5 +82,26 @@ it's the operating procedure; `docs/tz.md` is the source of truth if the two eve
 
 ## Status
 
-Early / experimental. See `docs/log.md` for the current iteration history and the latest
-state of the project.
+Preparation complete: sandboxed storage, DNA report pipeline, WebFlux+JTE UI, and MCP
+tools are in place. See `docs/log.md` for the current iteration history.
+
+## Running
+
+Requires JDK 21+ (the build produces Java 21 bytecode).
+
+```
+./gradlew test
+./gradlew generateDnaReport
+./gradlew bootRun
+```
+
+On Windows, use `gradlew.bat` instead of `./gradlew`.
+
+- Web UI: `http://localhost:8080/`
+- Report page: `http://localhost:8080/report`
+- HTTP API: `GET /api/files`, `GET /api/files/content?path=...`, `GET /api/report`,
+  `POST /api/report/regenerate`
+- MCP: Spring AI WebFlux SSE server (see `spring.ai.mcp.server` in `application.yml`).
+  Tools: `regenerate_dna_report`, `read_dna_report`, `list_files`, `read_file`.
+
+The DNA decoder (`generateDnaReport`) is also step 1 of every later iteration.

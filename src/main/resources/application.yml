@@ -1,0 +1,38 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: webjcvi
+  ai:
+    mcp:
+      server:
+        name: webjcvi
+        version: 0.1.0
+        type: SYNC
+        instructions: >
+          WebJCVI MCP server. Tools operate only inside the project directory
+          and enforce a 500 MB per-file size limit. Use regenerate_dna_report,
+          read_dna_report, list_files, and read_file.
+        annotation-scanner:
+          enabled: false
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+          completion: false
+
+gg:
+  jte:
+    development-mode: true
+    template-location: src/main/jte
+    template-suffix: .jte
+
+webjcvi:
+  storage:
+    max-file-size-bytes: 524288000
+  dna:
+    relative-path: jcvi-dna.txt
+  report:
+    directory: build/reports/dna
+    file-name: dna-report.md
