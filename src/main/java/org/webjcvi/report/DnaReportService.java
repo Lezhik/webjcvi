@@ -13,6 +13,8 @@ import java.util.Optional;
 import java.util.StringJoiner;
 import org.webjcvi.dna.DnaParser;
 import org.webjcvi.dna.DnaSequence;
+import org.webjcvi.dna.HomopolymerProfile;
+import org.webjcvi.dna.WrapCensus;
 import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.storage.StorageNotFoundException;
 
@@ -72,11 +74,19 @@ public final class DnaReportService {
      */
     public DnaReport regenerate() {
         storage.deleteContents(reportDirectory);
-        DnaSequence sequence = readSequence();
+        String raw;
+        try {
+            raw = storage.readText(dnaRelativePath);
+        } catch (StorageNotFoundException e) {
+            raw = "";
+        }
+        DnaSequence sequence = parser.parse(raw);
         Instant generatedAt = clock.instant();
         List<String> javaSources = listJavaSources();
-        Map<String, String> sections = buildSections(sequence, generatedAt, javaSources);
-        String markdown = renderMarkdown(sections, sequence, generatedAt, javaSources);
+        WrapCensus wraps = WrapCensus.fromRaw(raw);
+        HomopolymerProfile runs = HomopolymerProfile.from(sequence);
+        Map<String, String> sections = buildSections(sequence, generatedAt, javaSources, wraps, runs);
+        String markdown = renderMarkdown(sections, sequence, generatedAt, javaSources, wraps, runs);
         storage.writeText(reportRelativePath(), markdown);
         return new DnaReport(generatedAt, sequence, sections, markdown);
     }
@@ -116,7 +126,11 @@ public final class DnaReportService {
     }
 
     private Map<String, String> buildSections(
-            DnaSequence sequence, Instant generatedAt, List<String> javaSources) {
+            DnaSequence sequence,
+            Instant generatedAt,
+            List<String> javaSources,
+            WrapCensus wraps,
+            HomopolymerProfile runs) {
         Map<String, String> sections = new LinkedHashMap<>();
         sections.put("meta", "generatedAt=" + ISO.format(generatedAt));
         sections.put("length", Integer.toString(sequence.length()));
@@ -124,6 +138,10 @@ public final class DnaReportService {
         sections.put("ambiguousTotal", Long.toString(sequence.ambiguousTotal()));
         sections.put("invalidTotal", Long.toString(sequence.invalidTotal()));
         sections.put("javaSourceCount", Integer.toString(javaSources.size()));
+        sections.put("wrapModalWidth", Integer.toString(wraps.modalWidth()));
+        sections.put("wrapMedianWidth", Integer.toString(wraps.medianWidth()));
+        sections.put("longestHomopolymer", runs.longestBase() + "x" + runs.longestLength());
+        sections.put("homopolymerRunsAtLeast5", Long.toString(runs.runsAtLeast5()));
         return sections;
     }
 
@@ -131,13 +149,15 @@ public final class DnaReportService {
             Map<String, String> sections,
             DnaSequence sequence,
             Instant generatedAt,
-            List<String> javaSources) {
+            List<String> javaSources,
+            WrapCensus wraps,
+            HomopolymerProfile runs) {
         StringBuilder md = new StringBuilder();
         md.append("# WebJCVI DNA Report\n\n");
         md.append("Generated at **").append(ISO.format(generatedAt.atOffset(ZoneOffset.UTC))).append("**.\n\n");
         md.append("This report is rebuilt from `").append(dnaRelativePath)
-                .append("` and a snapshot of the current codebase. The DNA is a growth rule, ")
-                .append("not a literal spec — later iterations reinterpret it against this snapshot.\n\n");
+                .append("` and a snapshot of the current codebase. Version 2 of the builder ")
+                .append("reads the tape as framed lines plus homopolymer runs, not only a bag of bases.\n\n");
 
         md.append("## Sequence composition\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
@@ -178,6 +198,31 @@ public final class DnaReportService {
         md.append("First ").append(PREVIEW_BASES).append(" normalized bases:\n\n```\n");
         md.append(sequence.preview(PREVIEW_BASES)).append("\n```\n\n");
 
+        md.append("## Wrap frame census\n\n");
+        md.append("Raw file lines (FASTA wrapping) treated as tape frames.\n\n");
+        md.append("| Metric | Value |\n| --- | --- |\n");
+        md.append("| Lines | ").append(wraps.lineCount()).append(" |\n");
+        md.append("| Min width | ").append(wraps.minWidth()).append(" |\n");
+        md.append("| Median width | ").append(wraps.medianWidth()).append(" |\n");
+        md.append("| Modal width | ").append(wraps.modalWidth()).append(" |\n");
+        md.append("| Max width | ").append(wraps.maxWidth()).append(" |\n\n");
+
+        md.append("## Homopolymer run census\n\n");
+        md.append("Consecutive identical canonical bases. The v1 preview showed poly-A/T by eye; ");
+        md.append("this version measures it. Buckets start at length 5 (the runs visible in the 80-base preview).\n\n");
+        md.append("Longest run: **").append(runs.longestBase()).append(" × ").append(runs.longestLength())
+                .append("**. Runs of length ≥ 5: **").append(runs.runsAtLeast5()).append("**.\n\n");
+        md.append("| Base | Max run |\n| --- | --- |\n");
+        runs.maxRun().forEach((base, len) ->
+                md.append("| ").append(base).append(" | ").append(len).append(" |\n"));
+        md.append("\n| 5–9 | 10–19 | 20+ |\n| --- | --- | --- |\n| ")
+                .append(runs.runs5to9()).append(" | ")
+                .append(runs.runs10to19()).append(" | ")
+                .append(runs.runs20plus()).append(" |\n\n");
+
+        md.append("## Extracted tape rules\n\n");
+        appendExtractedRules(md, sequence, wraps, runs);
+
         md.append("## Codebase snapshot\n\n");
         md.append(javaSources.size()).append(" Java source files under `src/main/java`:\n\n");
         if (javaSources.isEmpty()) {
@@ -191,18 +236,40 @@ public final class DnaReportService {
 
         md.append("## Growth notes for the next iteration\n\n");
         md.append("- Dominant canonical base: **").append(dominantBase(sequence)).append("**.\n");
-        md.append("- GC content is **")
-                .append(String.format(Locale.ROOT, "%.2f", sequence.gcPercent()))
-                .append("%**; AT-rich sequences may suggest keeping the next change small and conservative.\n");
-        md.append("- Both the web UI and the MCP server already wrap this service; ");
-        md.append("prefer adding capability to this class first, then exposing it on both surfaces.\n");
-        md.append("- Module split (TZ §6.8) is **not** indicated: single Gradle module, no sub-module reports.\n");
+        md.append("- Wrap modal width **").append(wraps.modalWidth())
+                .append("**; the next builder should ask what sits at frame boundaries, not only inside them.\n");
+        md.append("- Longest homopolymer **").append(runs.longestBase()).append(" × ").append(runs.longestLength())
+                .append("** (").append(runs.runsAtLeast5()).append(" runs ≥ 5). ")
+                .append("If the tape-protocol hypothesis is weak, the next hypothesis should use these measured runs, not the 80-base preview.\n");
+        md.append("- Module split (TZ §6.12) is **not** indicated: single Gradle module, no sub-module reports.\n");
 
         md.append("\n## Machine-readable sections\n\n");
         md.append("```\n");
         sections.forEach((key, value) -> md.append(key).append('=').append(value).append('\n'));
         md.append("```\n");
         return md.toString();
+    }
+
+    private static void appendExtractedRules(
+            StringBuilder md, DnaSequence sequence, WrapCensus wraps, HomopolymerProfile runs) {
+        long a = sequence.canonicalCounts().getOrDefault('A', 0L);
+        long t = sequence.canonicalCounts().getOrDefault('T', 0L);
+        md.append("1. **R1 Exact closed alphabet.** Ambiguous=")
+                .append(sequence.ambiguousTotal())
+                .append(", invalid=").append(sequence.invalidTotal())
+                .append(". Matching is fold-then-exact.\n");
+        md.append("2. **R2 Complementary payload.** A=").append(a)
+                .append(", T=").append(t)
+                .append(" (|A−T|=").append(Math.abs(a - t))
+                .append(" of ").append(sequence.length())
+                .append("). The tape is one linear buffer, not a graph.\n");
+        md.append("3. **R3 Homopolymer delimiters.** Longest run ")
+                .append(runs.longestBase()).append("×").append(runs.longestLength())
+                .append("; ").append(runs.runsAtLeast5())
+                .append(" runs of length ≥ 5. Consecutive identical symbols are a native structure.\n");
+        md.append("4. **R4 Framed lines.** ").append(wraps.lineCount())
+                .append(" lines, modal width ").append(wraps.modalWidth())
+                .append(". Hits report a line offset, not only a yes/no.\n\n");
     }
 
     private static String dominantBase(DnaSequence sequence) {

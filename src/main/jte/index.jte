@@ -32,7 +32,8 @@
             <p><a href="/report">Open the full report</a></p>
         @else
             <p>No report on disk yet. Generate one from <code>jcvi-dna.txt</code>.</p>
-        @endif
+            @endif
+        <p><a href="/tape">Open the scratch tape</a> (paste text, exact-find, list runs).</p>
         <form method="post" action="/report/regenerate">
             <button type="submit">Regenerate report</button>
         </form>

@@ -37,6 +37,9 @@ class WorkspaceApiControllerTest {
     @Autowired
     FileStorageService storage;
 
+    @Autowired
+    org.webjcvi.tape.ScratchTape tape;
+
     @Test
     void listAndReadStayInsideTheSandbox() {
         storage.writeText("ok.txt", "hello-api");
@@ -110,6 +113,46 @@ class WorkspaceApiControllerTest {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody(String.class)
-                .value(html -> assertThat(html).contains("WebJCVI"));
+                .value(html -> {
+                    assertThat(html).contains("WebJCVI");
+                    assertThat(html).contains("/tape");
+                });
+    }
+
+    @Test
+    void scratchTapeApiRoundTrip() {
+        tape.clear();
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/tape").queryParam("text", "Hello\nHELLO").build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.length").isEqualTo(11);
+
+        webTestClient.get()
+                .uri(uri -> uri.path("/api/tape/find").queryParam("q", "hello").build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].line").isEqualTo(1)
+                .jsonPath("$[1].line").isEqualTo(2);
+
+        webTestClient.get()
+                .uri("/api/tape/runs?min=2")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].symbol").isEqualTo("L")
+                .jsonPath("$[0].length").isEqualTo(2);
+    }
+
+    @Test
+    void tapePageRenders() {
+        webTestClient.get()
+                .uri("/tape")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Scratch tape"));
     }
 }

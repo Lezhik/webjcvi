@@ -6,6 +6,9 @@ build/
 # Generated DNA/code reports (TZ §5.3)
 build/reports/
 
+# JTE on-demand compiled templates (starter default output)
+jte-classes/
+
 # IDE
 .idea/
 *.iml

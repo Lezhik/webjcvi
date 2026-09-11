@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.webjcvi.report.DnaReport;
 import org.webjcvi.report.DnaReportService;
 import org.webjcvi.storage.FileStorageService;
+import org.webjcvi.tape.ScratchTape;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -26,10 +27,13 @@ public class WorkspaceApiController {
 
     private final FileStorageService storage;
     private final DnaReportService reports;
+    private final ScratchTape tape;
 
-    public WorkspaceApiController(FileStorageService storage, DnaReportService reports) {
+    public WorkspaceApiController(
+            FileStorageService storage, DnaReportService reports, ScratchTape tape) {
         this.storage = storage;
         this.reports = reports;
+        this.tape = tape;
     }
 
     @GetMapping("/files")
@@ -66,5 +70,56 @@ public class WorkspaceApiController {
                     body.put("sections", report.sectionNames());
                     return body;
                 });
+    }
+
+    @PostMapping("/tape")
+    public Mono<Map<String, Object>> loadTape(@RequestParam("text") String text) {
+        return Mono.fromCallable(() -> {
+                    tape.load(text);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("length", tape.length());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @GetMapping("/tape")
+    public Mono<Map<String, Object>> tapeStatus() {
+        return Mono.fromCallable(() -> {
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("length", tape.length());
+                    body.put("preview", tape.preview(80));
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @GetMapping("/tape/find")
+    public Mono<List<Map<String, Object>>> find(@RequestParam("q") String query) {
+        return Mono.fromCallable(() -> tape.find(query).stream()
+                        .map(hit -> {
+                            Map<String, Object> row = new LinkedHashMap<>();
+                            row.put("offset", hit.offset());
+                            row.put("line", hit.line());
+                            row.put("snippet", hit.snippet());
+                            return row;
+                        })
+                        .toList())
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @GetMapping("/tape/runs")
+    public Mono<List<Map<String, Object>>> runs(
+            @RequestParam(name = "min", defaultValue = "5") int minLength) {
+        return Mono.fromCallable(() -> tape.runs(minLength, 40).stream()
+                        .map(run -> {
+                            Map<String, Object> row = new LinkedHashMap<>();
+                            row.put("symbol", String.valueOf(run.symbol()));
+                            row.put("offset", run.offset());
+                            row.put("length", run.length());
+                            return row;
+                        })
+                        .toList())
+                .subscribeOn(Schedulers.boundedElastic());
     }
 }

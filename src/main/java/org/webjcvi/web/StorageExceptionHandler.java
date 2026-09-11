@@ -9,9 +9,16 @@ import org.webjcvi.storage.FileSizeLimitException;
 import org.webjcvi.storage.PathEscapeException;
 import org.webjcvi.storage.StorageException;
 import org.webjcvi.storage.StorageNotFoundException;
+import org.webjcvi.tape.TapeException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
+
+    @ExceptionHandler(TapeException.class)
+    ResponseEntity<Map<String, String>> tape(TapeException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "tape", "message", ex.getMessage()));
+    }
 
     @ExceptionHandler(PathEscapeException.class)
     ResponseEntity<Map<String, String>> pathEscape(PathEscapeException ex) {

@@ -36,6 +36,9 @@ class WebJcviMcpToolsTest {
                 .containsExactlyInAnyOrder(
                         "regenerate_dna_report",
                         "read_dna_report",
+                        "tape_load",
+                        "tape_find",
+                        "tape_runs",
                         "list_files",
                         "read_file");
     }
@@ -84,5 +87,15 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
+        assertThat(markdown).contains("Homopolymer run census");
+    }
+
+    @Test
+    void scratchTapeFindDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "needle-in-file");
+        assertThat(tools.tapeLoad("Needle in the haystack")).startsWith("loaded");
+        assertThat(tools.tapeFind("needle")).contains("offset 0");
+        assertThat(tools.tapeRuns(2)).contains("E x2");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("needle-in-file");
     }
 }

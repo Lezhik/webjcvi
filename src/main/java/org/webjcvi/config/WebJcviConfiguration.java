@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import org.webjcvi.dna.DnaParser;
 import org.webjcvi.report.DnaReportService;
 import org.webjcvi.storage.FileStorageService;
+import org.webjcvi.tape.ScratchTape;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -25,6 +26,11 @@ public class WebJcviConfiguration {
     @Bean
     Clock clock() {
         return Clock.systemUTC();
+    }
+
+    @Bean
+    ScratchTape scratchTape() {
+        return new ScratchTape();
     }
 
     @Bean
