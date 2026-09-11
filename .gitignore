@@ -6,9 +6,6 @@ build/
 # Generated DNA/code reports (TZ §5.3)
 build/reports/
 
-# JTE development-mode compile output
-jte-classes/
-
 # IDE
 .idea/
 *.iml

@@ -27,6 +27,8 @@ gg:
     development-mode: true
     template-location: src/main/jte
     template-suffix: .jte
+    # Compiled templates go to build/jte-classes via JteTemplateConfiguration
+    # (the starter otherwise writes jte-classes at the project root).
 
 webjcvi:
   storage:
