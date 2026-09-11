@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.webjcvi.segment.SegmentException;
 import org.webjcvi.storage.FileSizeLimitException;
 import org.webjcvi.storage.PathEscapeException;
 import org.webjcvi.storage.StorageException;
@@ -18,6 +19,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> tape(TapeException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "tape", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(SegmentException.class)
+    ResponseEntity<Map<String, String>> segment(SegmentException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "segment", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

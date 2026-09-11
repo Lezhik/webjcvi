@@ -39,6 +39,7 @@ class WebJcviMcpToolsTest {
                         "tape_load",
                         "tape_find",
                         "tape_runs",
+                        "split_banners",
                         "list_files",
                         "read_file");
     }
@@ -87,7 +88,8 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Homopolymer run census");
+        assertThat(markdown).contains("Frame-window Chargaff skew");
+        assertThat(markdown).contains("Homopolymer remainder");
     }
 
     @Test
@@ -97,5 +99,15 @@ class WebJcviMcpToolsTest {
         assertThat(tools.tapeFind("needle")).contains("offset 0");
         assertThat(tools.tapeRuns(2)).contains("E x2");
         assertThat(tools.readFile("secret.txt")).isEqualTo("needle-in-file");
+    }
+
+    @Test
+    void splitBannersDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "==========hidden");
+        String result = tools.splitBanners("head\n==========\ntail", 10);
+        assertThat(result).contains("head");
+        assertThat(result).contains("tail");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("==========hidden");
     }
 }

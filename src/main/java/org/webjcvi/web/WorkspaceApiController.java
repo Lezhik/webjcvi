@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.webjcvi.report.DnaReport;
 import org.webjcvi.report.DnaReportService;
+import org.webjcvi.segment.BannerSplitter;
 import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.tape.ScratchTape;
 import reactor.core.publisher.Mono;
@@ -28,12 +29,17 @@ public class WorkspaceApiController {
     private final FileStorageService storage;
     private final DnaReportService reports;
     private final ScratchTape tape;
+    private final BannerSplitter splitter;
 
     public WorkspaceApiController(
-            FileStorageService storage, DnaReportService reports, ScratchTape tape) {
+            FileStorageService storage,
+            DnaReportService reports,
+            ScratchTape tape,
+            BannerSplitter splitter) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
+        this.splitter = splitter;
     }
 
     @GetMapping("/files")
@@ -117,6 +123,24 @@ public class WorkspaceApiController {
                             row.put("symbol", String.valueOf(run.symbol()));
                             row.put("offset", run.offset());
                             row.put("length", run.length());
+                            return row;
+                        })
+                        .toList())
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/split")
+    public Mono<List<Map<String, Object>>> split(
+            @RequestParam("text") String text,
+            @RequestParam(name = "min", defaultValue = "10") int minRun) {
+        return Mono.fromCallable(() -> splitter.split(text, minRun).stream()
+                        .map(section -> {
+                            Map<String, Object> row = new LinkedHashMap<>();
+                            row.put("index", section.index());
+                            row.put("offset", section.offset());
+                            row.put("length", section.length());
+                            row.put("preview", section.preview());
+                            row.put("banner", section.banner());
                             return row;
                         })
                         .toList())

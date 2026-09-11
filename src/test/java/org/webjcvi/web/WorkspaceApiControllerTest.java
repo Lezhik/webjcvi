@@ -116,6 +116,7 @@ class WorkspaceApiControllerTest {
                 .value(html -> {
                     assertThat(html).contains("WebJCVI");
                     assertThat(html).contains("/tape");
+                    assertThat(html).contains("/split");
                 });
     }
 
@@ -154,5 +155,47 @@ class WorkspaceApiControllerTest {
                 .expectStatus().isOk()
                 .expectBody(String.class)
                 .value(html -> assertThat(html).contains("Scratch tape"));
+    }
+
+    @Test
+    void bannerSplitApiCutsOnLongRuns() {
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/split")
+                        .queryParam("text", "alpha\n==========\nbeta")
+                        .queryParam("min", "10")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].preview").isEqualTo("alpha")
+                .jsonPath("$[1].banner").isEqualTo("==========")
+                .jsonPath("$[1].preview").isEqualTo("beta");
+    }
+
+    @Test
+    void splitPageRenders() {
+        webTestClient.get()
+                .uri("/split")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Banner split"));
+    }
+
+    @Test
+    void splitPageFormCutsOnLongRuns() {
+        webTestClient.post()
+                .uri("/split")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=alpha%0A==========%0Abeta&minRun=10")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("2 section");
+                    assertThat(html).contains("alpha");
+                    assertThat(html).contains("beta");
+                    assertThat(html).contains("==========");
+                });
     }
 }

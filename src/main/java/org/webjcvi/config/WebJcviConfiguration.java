@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.webjcvi.dna.DnaParser;
 import org.webjcvi.report.DnaReportService;
+import org.webjcvi.segment.BannerSplitter;
 import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.tape.ScratchTape;
 
@@ -31,6 +32,11 @@ public class WebJcviConfiguration {
     @Bean
     ScratchTape scratchTape() {
         return new ScratchTape();
+    }
+
+    @Bean
+    BannerSplitter bannerSplitter() {
+        return new BannerSplitter();
     }
 
     @Bean

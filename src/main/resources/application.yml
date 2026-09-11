@@ -13,9 +13,9 @@ spring:
         instructions: >
           WebJCVI MCP server. Tools operate only inside the project directory
           and enforce a 500 MB per-file size limit. Use regenerate_dna_report,
-          read_dna_report, tape_load, tape_find, tape_runs, list_files, and
-          read_file. The scratch tape is in-memory caller text (not DNA, not
-          project files).
+          read_dna_report, tape_load, tape_find, tape_runs, split_banners,
+          list_files, and read_file. The scratch tape and banner splitter
+          operate on in-memory caller text (not DNA, not project files).
         annotation-scanner:
           enabled: false
         capabilities:

@@ -34,6 +34,7 @@
             <p>No report on disk yet. Generate one from <code>jcvi-dna.txt</code>.</p>
             @endif
         <p><a href="/tape">Open the scratch tape</a> (paste text, exact-find, list runs).</p>
+        <p><a href="/split">Open banner split</a> (cut pasted logs on long character runs).</p>
         <form method="post" action="/report/regenerate">
             <button type="submit">Regenerate report</button>
         </form>
