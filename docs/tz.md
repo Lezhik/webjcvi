@@ -1,4 +1,4 @@
-# WebJCVI — Technical Specification (TZ)
+# WebJCVI — Technical Specification
 
 ## 1. Project Summary
 
@@ -12,19 +12,62 @@ capabilities (DNA reading, report generation, storage access, and whatever else 
 of later iterations) as MCP tools/resources that other AI agents can call directly. The
 project is dual-purpose by design: it's both something a person can open in a browser and
 something an AI agent can attach to as an MCP client. Growth decisions each iteration should
-consider **both** surfaces, not just the web UI — see Section 5.5 and Section 6.4.
+consider **both** surfaces, not just the web UI — see Section 5.5 and Section 6.5.
 
-A DNA file (`jcvi-dna.txt`, located at the project root) is treated as a **growth ruleset**:
-at each iteration, the LLM re-reads a freshly generated report derived from the DNA and the
+A DNA file (`jcvi-dna.txt`, located at the project root) is treated as a **growth ruleset** —
+but not an arbitrary one. The working premise of this project is that **the DNA encodes
+hidden rules for a system that performs generally useful work, unrelated to the DNA itself
+and unrelated to this project's own existence.** What that useful work actually is — what
+kind of system, what capabilities, what purpose — is **not known in advance**. It must be
+**gradually deciphered** across iterations by forming hypotheses about what the DNA encodes,
+testing each hypothesis by building the functionality it implies, and evaluating whether the
+result is genuinely useful (as a standalone capability, not just "useful for reading DNA" or
+"useful for this project"). See Section 1.1 and Section 6 for how this decryption process
+works mechanically.
+
+At each iteration, the LLM re-reads a freshly generated report derived from the DNA and the
 current codebase, consults the spec (this document) and the decision log, and decides how to
-patch/extend the application — on the web side, the MCP side, or both. Over time, as the app
-grows, it may split into modules and sub-modules, each with its own report and its own patch
-history.
+patch/extend the application — on the web side, the MCP side, or both — in service of testing
+its current hypothesis about the hidden rules. Over time, as the app grows, it may split into
+modules and sub-modules, each with its own report and its own patch history.
 
 This is not a simulation of biology in the strict sense — the DNA sequence is a structured,
 deterministic input that is *reinterpreted freely by the LLM* at every step as inspiration/
 constraint for the next code change. The exact mapping from DNA content to code decisions is
 intentionally left to the LLM's judgment at each iteration, not hard-coded.
+
+### 1.1 The decryption model
+
+Treat the DNA as an encrypted message whose plaintext is "a spec for some generally useful
+system." Nobody knows the plaintext up front, including the operator. The iteration loop
+exists to decrypt it incrementally:
+
+- Each iteration proposes a **hypothesis**: "the hidden rule the DNA is encoding might be
+  ___, and if so, the system should be able to do ___."
+- The hypothesis is tested by actually **building** the functionality it implies (on the web
+  UI, the MCP server, or both).
+- The resulting functionality is then judged on its own merits: **is it actually useful**,
+  as a general-purpose capability, independent of the fact that it came from a DNA file or
+  that this is a research project? Usefulness here means the kind of thing a person or
+  another piece of software would genuinely want — not "interesting because it's DNA-driven."
+- Every hypothesis has pros and cons as a decryption of the DNA (does it explain more of the
+  sequence's structure? does it produce something coherent and useful, or something
+  arbitrary and forced?). These are captured explicitly every iteration.
+- The **DNA report builder itself is part of what evolves**. Each iteration produces a new
+  version of the report-building logic, informed by the current hypothesis's pros and cons,
+  intended to surface whatever information would help resolve the contradictions found so
+  far. A report builder version must be meaningfully different from every previous version —
+  not a cosmetic tweak — because it represents a genuinely different angle of attack on
+  decrypting the same DNA.
+- **Hypotheses must not repeat.** Before proposing a new hypothesis, the agent must check
+  prior hypotheses recorded in `docs/log.md` and ensure the new one is meaningfully distinct
+  — a different theory of what the DNA encodes, not a restatement or minor variant of one
+  already tried.
+- Consequently, the application's functionality may swing meaningfully between iterations
+  as different hypotheses are tried, abandoned, refined, or combined. This is expected —
+  the goal is convergence toward a hypothesis that actually explains the DNA well *and*
+  produces something genuinely useful, not steady incremental feature accumulation on a
+  single fixed theory.
 
 ## 2. Operating Model
 
@@ -48,7 +91,7 @@ intentionally left to the LLM's judgment at each iteration, not hard-coded.
 - **Build tool:** Gradle with the Kotlin DSL (`build.gradle.kts`), single module for now,
   with the codebase organized into growing sub-packages (`dna`, `report`, `storage`, `web`,
   etc.). If/when the project genuinely outgrows a single module (per the module-splitting
-  rule in Section 6.8), it should be migrated to a Gradle multi-module (multi-project)
+  rule in Section 6.12), it should be migrated to a Gradle multi-module (multi-project)
   layout at that point — this is not required from day one.
 - **Version control:** Git, local commits only (no `push` as part of the automated flow)
 
@@ -92,11 +135,17 @@ intentionally left to the LLM's judgment at each iteration, not hard-coded.
     reading the file directly)
   - Building a report from the DNA content
   - The exact *content* of the report (what statistics, patterns, or summaries it contains)
-    is **decided by the LLM at each iteration**, based on what was useful/learned from
-    previous iterations — the report is not a fixed, hard-coded format. The class's fixed
-    API should therefore be generic enough to support an evolving report structure
+    is **decided by the LLM at each iteration** as part of the decryption process described
+    in Section 1.1 — the report is not a fixed, hard-coded format, and its content is
+    expected to change meaningfully from iteration to iteration as new hypotheses about the
+    hidden rules are tried and the pros/cons of the current one are identified. The class's
+    fixed API should therefore be generic enough to support an evolving report structure
     (e.g., returning a structured/extensible report object or writing a
     markdown/JSON report file whose section content varies over time).
+  - Each new version of the report builder must be **meaningfully different from previous
+    versions**, not a cosmetic adjustment — it should represent a genuinely different
+    approach to extracting signal from the DNA, chosen to resolve the specific
+    contradictions/cons identified for the current hypothesis (see Section 6.8).
   - The DNA reader/report builder must be re-invokable at will (idempotent): every
     iteration starts by regenerating the report from scratch based on current DNA + current
     codebase state.
@@ -104,16 +153,17 @@ intentionally left to the LLM's judgment at each iteration, not hard-coded.
 ### 5.3 Report lifecycle
 
 - Reports are generated into `build/reports/` (or a module-specific subfolder once module
-  splitting begins — see 6.8).
+  splitting begins — see 6.12).
 - `build/reports/` is **excluded from Git** (must be in `.gitignore`).
 - At the start of the **preparation phase** (initial setup, before the iteration loop
   begins), a "DNA decoder" step must:
   1. Delete any pre-existing reports in `build/reports/`, if present
   2. Read the DNA file
-  3. Generate a fresh report
+  3. Generate a fresh report (using the initial report builder — see Section 6.8 for how it
+     evolves from there)
 - The same regeneration must happen as **step 1 of every iteration** (Section 6.1) — the
   report always reflects the current state of the DNA and the code generated in the
-  previous iteration.
+  previous iteration, using whatever report builder version is currently in place.
 
 ### 5.4 Automated tests
 
@@ -157,51 +207,95 @@ The project must include automated tests covering at minimum:
 
 ## 6. Iteration Algorithm
 
-Each iteration, performed in order by the operator/agent via Cursor:
+Each iteration, performed in order by the operator/agent via Cursor. This algorithm exists to
+drive the decryption process from Section 1.1 — treat the hypothesis/report-builder steps as
+seriously as the code-change steps; they are not bookkeeping, they're the actual research
+method of this project.
 
 ### 6.1 Regenerate the DNA report
-Invoke the fixed-API DNA reader/report class to rebuild the report based on the DNA file
-and the code as it exists after the previous iteration.
+Invoke the fixed-API DNA reader/report class to rebuild the report, using **the report
+builder version currently in place** (i.e., the one produced at the end of the previous
+iteration's Section 6.8), based on the DNA file and the code as it exists after the previous
+iteration.
 
 ### 6.2 Read the spec
 Read `docs/tz.md` (this document) in full.
 
 ### 6.3 Read the decision log
-Read `docs/log.md` to understand the history of prior decisions and their rationale.
+Read `docs/log.md` in full, in particular every prior hypothesis and its recorded pros/cons.
+This is required input for Section 6.4 — you cannot form a valid new hypothesis without
+knowing what's already been tried.
 
-### 6.4 Decide on a code change
-Based on the freshly generated report, the log, and the spec, decide what change to make
-to the codebase for this iteration. The DNA is treated as a **growth rule** — i.e., a
-constraint/inspiration for how the code should be patched or extended, not a literal
-translation table. The scope of a single iteration's change should be small and reviewable
-(one coherent step of growth, not a rewrite).
+### 6.4 Form a hypothesis about the hidden rules
+Based on the freshly generated report and the full hypothesis history in the log, propose a
+hypothesis: *what generally useful system might this DNA be encoding rules for, and what
+should that system therefore be able to do?* Per Section 1.1, this hypothesis must be
+**meaningfully different from every previous hypothesis** recorded in `docs/log.md` — not a
+restatement, not a minor variant. If the log shows an existing hypothesis with unresolved
+cons, this iteration's hypothesis may attempt to *refine or replace* it, but the replacement
+itself must still be a distinct theory, not the same one restated.
 
-Explicitly consider **both surfaces** when deciding: does this iteration's growth belong on
-the web UI, the MCP server, or both? A new capability discovered from the DNA/report should
-generally be added to the shared underlying class (5.1/5.2/etc.) and then exposed through
-whichever surface(s) make sense — not silently added to only one surface by default.
+### 6.5 Change the web and MCP functionality
+Implement the code change(s) needed to build out (or test) what this iteration's hypothesis
+implies the system should do. Explicitly consider **both surfaces**: does this hypothesis's
+functionality belong on the web UI, the MCP server, or both? Add the capability to the
+shared underlying class(es) first, then expose it through whichever surface(s) make sense —
+don't default to web-only. The scope of a single iteration's change should be small and
+reviewable (one coherent step of growth, not a rewrite).
 
-### 6.5 Record the decision
-Append an entry to `docs/log.md` describing:
-- The iteration number
-- What was decided and why (tie it back to the report/DNA input where relevant)
-- What was changed in the code
+### 6.6 Analyze the resulting code
+Step back and evaluate the functionality you just built **on its own merits** — as if you
+didn't know it came from a DNA file or that this is a research project. Would a person or
+another piece of software genuinely want this capability? Is it coherent, or does it feel
+arbitrary/forced? Record this assessment honestly, including if the answer is "not very
+useful" — that's a legitimate and important outcome, not a failure to hide.
 
-### 6.6 Commit
+### 6.7 Determine the pros and cons of the current DNA decryption
+Using the analysis from 6.6 together with the hypothesis from 6.4, list concrete pros and
+cons of treating the DNA this way:
+- **Pros:** what does this hypothesis explain well? What structure in the DNA does it
+  account for? What useful functionality did it produce?
+- **Cons:** what does it fail to explain? Where does the mapping from DNA to functionality
+  feel forced or arbitrary? What did the usefulness analysis in 6.6 reveal as weak or
+  missing?
+
+### 6.8 Build a new DNA report builder
+Based on the pros and cons from 6.7, design and implement a **new version of the DNA report
+builder** (Section 5.2) intended to help resolve the contradictions/cons just identified —
+e.g., by surfacing different structural signals from the DNA, or presenting the existing
+signals in a way that makes the next hypothesis easier to form or test. This new version
+must be **meaningfully different from every previous report builder version** — a different
+angle on the same DNA, not a cosmetic edit. This becomes the report builder used in the
+*next* iteration's Section 6.1.
+
+### 6.9 Record the decision
+Append an entry to `docs/log.md` for this iteration, using exactly this structure:
+
+```
+## Iteration #<index>
+- **Hypothesis:** <the hypothesis formed in 6.4>
+- **Functionality changes:** <what was built/changed in 6.5, and on which surface(s)>
+- **Pros:** <pros of this hypothesis, from 6.7>
+- **Cons:** <cons of this hypothesis, from 6.7>
+- **Report builder changes:** <what changed in the new report builder version from 6.8,
+  and how it addresses the cons above>
+```
+
+### 6.10 Commit
 Commit the change to Git (**no push**). Commit message format:
 
 ```
 Iteration #<index> - <brief description>
 ```
 
-### 6.7 Report to the operator
-Output a summary message describing what was done this iteration (what changed, why, and
-any notable observations from the report).
+### 6.11 Report to the operator
+Output a summary message describing what was done this iteration: the hypothesis tried, what
+was built, the pros/cons found, and how the report builder changed for next time.
 
-### 6.8 Module growth
+### 6.12 Module growth
 As the application grows, it may be split into modules and sub-modules. When this happens:
-- Each module/sub-module gets **its own DNA-derived report** and **its own patch/iteration
-  history** going forward, scoped to that module
+- Each module/sub-module gets **its own DNA-derived report**, **its own hypothesis
+  track**, and **its own patch/iteration history** going forward, scoped to that module
 - The decision to split, and the resulting structure, should itself be recorded in
   `docs/log.md` as an iteration
 - The single-module Gradle layout (Section 3) should transition to a Gradle multi-project
@@ -226,14 +320,19 @@ As the application grows, it may be split into modules and sub-modules. When thi
 
 ## 8. Open Points / Assumptions Made
 
-- **DNA-to-code mapping logic** is intentionally left undefined here — by design, this is
-  decided fresh by the LLM at each iteration based on the report, log, and spec, not
-  specified as a fixed algorithm.
-- **Report content/format** is intentionally left open-ended per Section 5.2 — the fixed
-  API must support an evolving report structure rather than assuming a fixed schema.
+- **What the DNA actually encodes** is unknown by design (Section 1.1) — this is not a gap
+  to fill in this document, it's the thing the iteration loop exists to discover.
+- **DNA-to-code mapping logic** is intentionally left undefined here — decided fresh each
+  iteration via the hypothesis process in Section 6.4–6.8, not specified as a fixed
+  algorithm.
+- **Report content/format** is intentionally left open-ended per Section 5.2 — expected to
+  change meaningfully every iteration as new report builder versions are produced.
 - **MCP tool/resource shape** is intentionally left open-ended per Section 5.5, for the same
-  reason — grows iteration by iteration rather than being fixed upfront.
+  reason — grows/changes iteration by iteration rather than being fixed upfront.
 - **Specific MCP library/SDK** for the Java/Spring Boot side is not pinned — chosen and
   recorded in `docs/log.md` when the first MCP-related iteration happens.
+- **No convergence criterion is defined** for when a hypothesis is "confirmed" — the process
+  is exploratory; hypotheses may be abandoned, revisited in modified form, or several may
+  turn out to coexist as different modules (Section 6.12) once the project splits.
 - **Stopping condition** for the overall iterative growth process is not defined — the
   process continues for as long as the operator chooses to run further iterations.

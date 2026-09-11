@@ -8,16 +8,24 @@ for requirements if the two ever conflict.
 ## What this project is
 
 WebJCVI grows an application, iteration by iteration, out of a real DNA sequence
-(`jcvi-dna.txt`). At each iteration, you (the agent) regenerate a report from the DNA and
-the current code, read the spec and the decision log, and decide the next small code change.
-The DNA is a **growth rule**, not a literal spec — how it maps to a code change is your
-judgment call, made fresh each iteration based on what you and prior iterations have learned.
+(`jcvi-dna.txt`). The working premise: **the DNA hides rules for a system that does some
+generally useful work, unrelated to the DNA itself and unrelated to this project.** Nobody
+knows what that work is yet — you're expected to figure it out gradually, iteration by
+iteration, by proposing a hypothesis about what the DNA encodes, building the functionality
+that hypothesis implies, and honestly judging whether it's actually useful. Full mechanics
+in `docs/tz.md` §1.1 and §6 — read those before running your first iteration, this is not
+optional context.
+
+This means the codebase's functionality is expected to **swing meaningfully between
+iterations**, not just accumulate features on one fixed theory. That's normal. Don't try to
+preserve a hypothesis just because it's already implemented — if the pros/cons analysis says
+it's weak, say so and let the next hypothesis move away from it.
 
 **The app has two surfaces: a web application, and an MCP server.** It is not "a web app
 with MCP bolted on" — treat both as first-class. Every capability you add should live in a
 shared underlying class and be exposed through whichever surface(s) make sense; growth
 decisions each iteration should explicitly consider both, not default to web-only. See
-`docs/tz.md` §5.5 and §6.4.
+`docs/tz.md` §5.5 and §6.5.
 
 ## Tech stack — do not deviate
 
@@ -34,7 +42,7 @@ decisions each iteration should explicitly consider both, not default to web-onl
 - **Build tool:** Gradle with the Kotlin DSL (`build.gradle.kts`, `settings.gradle.kts`).
   Do not add a `pom.xml` or switch to Groovy DSL.
 - **Module layout:** single module today. Only split into a Gradle multi-project layout
-  when the module-splitting trigger in `docs/tz.md` (Section 6.8) is actually reached, and
+  when the module-splitting trigger in `docs/tz.md` (Section 6.12) is actually reached, and
   record that decision in the log when you do it.
 
 ## Hard architectural rules
@@ -48,8 +56,10 @@ decisions each iteration should explicitly consider both, not default to web-onl
    have a test.
 3. **500 MB max file size**, enforced on both read and write, in the storage service.
 4. **DNA reading and report building goes through one class with a fixed API** (`docs/tz.md`
-   §5.2). The *content* of the report is yours to decide/evolve each iteration; the *class
-   API* around it should stay stable so other components can depend on it.
+   §5.2). The *content* of the report — and the report-building logic itself — evolves every
+   iteration as part of the decryption process (§1.1, §6.8): expect to replace it with a
+   meaningfully different version each time, not just tweak it. The *class API* around it
+   should stay stable so other components can depend on it.
 5. **Reports live in `build/reports/`** and are regenerated from scratch at the start of
    every iteration (old reports for the current scope are cleared first). `build/reports/`
    must stay in `.gitignore` — never commit generated reports.
@@ -61,32 +71,55 @@ decisions each iteration should explicitly consider both, not default to web-onl
 
 ## The iteration algorithm — follow every step, in order, every time
 
-When asked to run an iteration (or when picking up work in this repo), do exactly this:
+When asked to run an iteration (or when picking up work in this repo), do exactly this. This
+is the actual research method of the project — the hypothesis/analysis steps are not
+bookkeeping, don't shortcut them.
 
 1. **Regenerate the DNA report.** Call the fixed-API DNA/report class to rebuild the report
-   for the current scope (whole app, or the relevant module/sub-module) from `jcvi-dna.txt`
-   and the code as it stands after the previous iteration. Don't skip this even if you think
-   the DNA hasn't changed — the *code* has, and the report should reflect that context too.
+   for the current scope (whole app, or the relevant module/sub-module), using the report
+   builder version currently in place, from `jcvi-dna.txt` and the code as it stands after
+   the previous iteration.
 2. **Read `docs/tz.md`** in full (or re-confirm you have it fresh in context).
-3. **Read `docs/log.md`** in full to see what's been decided and why, so you don't repeat or
-   contradict prior reasoning.
-4. **Decide the next code change**, using the report + log + spec together. Treat the DNA
-   content as a growth constraint/inspiration for the patch, not a literal instruction set.
-   Explicitly consider whether this iteration's growth belongs on the web UI, the MCP
-   server, or both — don't default to web-only. Write the code change.
-5. **Append to `docs/log.md`**: the iteration number, what you decided and why (tie it back
-   to the report/DNA where relevant), and what changed in the code. Never edit or delete
-   prior log entries — this file is append-only history.
-6. **Commit** the change with `git commit` (no `git push`). Commit message format, exactly:
+3. **Read `docs/log.md`** in full — every prior hypothesis and its pros/cons, not just the
+   most recent entry. You need this to satisfy step 4's novelty requirement.
+4. **Form a hypothesis** about what generally useful system the DNA might be encoding rules
+   for, and what it should therefore be able to do. It must be **meaningfully different from
+   every prior hypothesis** in the log — check before you commit to one. Refining a prior
+   hypothesis is fine; restating it is not.
+5. **Change the web and MCP functionality** to build out what this hypothesis implies.
+   Explicitly consider whether it belongs on the web UI, the MCP server, or both — don't
+   default to web-only. Keep the change small and reviewable.
+6. **Analyze the resulting code honestly.** Would this capability be genuinely useful on its
+   own merits, independent of it coming from DNA or from this project? Say so plainly even
+   if the answer is "not really" — that's a valid and useful finding, not a bad outcome to
+   avoid.
+7. **Determine pros and cons of the current DNA decryption**, combining the hypothesis (step
+   4) and the honest analysis (step 6): what does this hypothesis explain well, what does it
+   fail to explain, where does it feel forced?
+8. **Build a new DNA report builder version**, driven by the pros/cons from step 7, aimed at
+   resolving the contradictions just identified. It must be **meaningfully different from
+   every previous report builder version** — a genuinely different way of reading the same
+   DNA, not a tweak. This is what step 1 will use next iteration.
+9. **Append to `docs/log.md`** using exactly this structure — do not omit any field:
    ```
-   Iteration #<index> - <brief description>
+   ## Iteration #<index>
+   - **Hypothesis:** <from step 4>
+   - **Functionality changes:** <from step 5, and which surface(s)>
+   - **Pros:** <from step 7>
+   - **Cons:** <from step 7>
+   - **Report builder changes:** <from step 8, and how it addresses the cons above>
    ```
-7. **Report back to the operator**: summarize what changed, why, and anything notable the
-   report surfaced.
-8. **Watch for module-split conditions.** If the app has grown to the point that a module or
-   sub-module makes sense (per `docs/tz.md` §6.8), propose/perform the split as its own
-   logged iteration, set up a scoped report + patch history for the new module, and migrate
-   the build to Gradle multi-project if not already done.
+   Never edit or delete prior log entries — this file is append-only history.
+10. **Commit** the change with `git commit` (no `git push`). Commit message format, exactly:
+    ```
+    Iteration #<index> - <brief description>
+    ```
+11. **Report back to the operator**: the hypothesis tried, what was built, the pros/cons
+    found, and how the report builder changed for next time.
+12. **Watch for module-split conditions.** If the app has grown to the point that a module or
+    sub-module makes sense (per `docs/tz.md` §6.12), propose/perform the split as its own
+    logged iteration, set up a scoped report + hypothesis track for the new module, and
+    migrate the build to Gradle multi-project if not already done.
 
 Do not reorder, merge, or silently skip these steps. If a step doesn't apply (e.g., no
 module split this iteration), say so explicitly in the log/summary rather than omitting it.
@@ -108,10 +141,17 @@ an iteration.
 
 ## Things you should never do in this repo
 
-- Never commit files under `build/**`.
+- Never commit files under `build/reports/`.
 - Never bypass the storage service for file I/O.
 - Never `git push`.
 - Never invent a fixed, hard-coded DNA→feature mapping table — that decision is meant to
   stay LLM-driven per iteration, per `docs/tz.md`.
+- Never propose a hypothesis that's a restatement or trivial variant of one already in
+  `docs/log.md` — check the log first.
+- Never ship a "new" report builder version that's a cosmetic tweak of the previous one —
+  it must represent a genuinely different way of reading the DNA.
+- Never skip the honesty of step 6 (usefulness analysis) to make a hypothesis look better
+  than it is — a weak result, reported accurately, is more valuable to the project than an
+  inflated one.
 - Never introduce a database, a different web stack, or a different build tool without an
   explicit update to `docs/tz.md` first.
