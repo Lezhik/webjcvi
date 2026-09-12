@@ -23,6 +23,7 @@ import org.webjcvi.mirror.MirrorJoint;
 import org.webjcvi.seam.SeamGuard;
 import org.webjcvi.phase.PhaseJoint;
 import org.webjcvi.frame.FrameFields;
+import org.webjcvi.clone.CloneScan;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -116,6 +117,11 @@ public class WebJcviConfiguration {
     @Bean
     FrameFields frameFields() {
         return new FrameFields();
+    }
+
+    @Bean
+    CloneScan cloneScan() {
+        return new CloneScan();
     }
 
     @Bean

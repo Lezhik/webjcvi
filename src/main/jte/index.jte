@@ -48,6 +48,7 @@
         <p><a href="/seam">Seam guard</a> (palindromic glue at hard-wrap line joints).</p>
         <p><a href="/phase">Phase joints</a> (reverse field at wrap-frame column 19).</p>
         <p><a href="/fields">Frame fields</a> (extract RC/reverse/identity slots from 70-wide records).</p>
+        <p><a href="/clones">Clone frames</a> (find duplicate 70-wide wrap records).</p>
         <form method="post" action="/report/regenerate">
             <button type="submit">Regenerate report</button>
         </form>

@@ -53,6 +53,7 @@ class WebJcviMcpToolsTest {
                         "flag_seams",
                         "phase_mirrors",
                         "extract_fields",
+                        "find_clones",
                         "analyze_logs",
                         "list_files",
                         "read_file");
@@ -102,7 +103,7 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Slot composition");
+        assertThat(markdown).contains("Frame clones");
         assertThat(markdown).contains("Frame remainder");
     }
 
@@ -259,6 +260,17 @@ class WebJcviMcpToolsTest {
         assertThat(result).contains("id ATGCATGC");
         assertThat(result).doesNotContain("hidden");
         assertThat(tools.readFile("secret.txt")).isEqualTo("GCTAGCTA-hidden");
+    }
+
+    @Test
+    void findClonesDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "CLONEFRAME-hidden");
+        String frame = "A".repeat(70);
+        String result = tools.findClones(frame + frame, 70);
+        assertThat(result).contains("cloneGroups=1");
+        assertThat(result).contains("cloneFrames=2");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("CLONEFRAME-hidden");
     }
 
     @Test

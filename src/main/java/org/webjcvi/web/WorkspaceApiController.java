@@ -22,6 +22,7 @@ import org.webjcvi.mirror.MirrorJoint;
 import org.webjcvi.seam.SeamGuard;
 import org.webjcvi.phase.PhaseJoint;
 import org.webjcvi.frame.FrameFields;
+import org.webjcvi.clone.CloneScan;
 import org.webjcvi.logs.LogAnalysisReport;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.report.DnaReport;
@@ -58,6 +59,7 @@ public class WorkspaceApiController {
     private final SeamGuard seams;
     private final PhaseJoint phase;
     private final FrameFields fields;
+    private final CloneScan clones;
     private final LogAnalysisService logAnalysis;
 
     public WorkspaceApiController(
@@ -78,6 +80,7 @@ public class WorkspaceApiController {
             SeamGuard seams,
             PhaseJoint phase,
             FrameFields fields,
+            CloneScan clones,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -96,6 +99,7 @@ public class WorkspaceApiController {
         this.seams = seams;
         this.phase = phase;
         this.fields = fields;
+        this.clones = clones;
         this.logAnalysis = logAnalysis;
     }
 
@@ -554,6 +558,33 @@ public class WorkspaceApiController {
                                 rec.put("rc", row.rc());
                                 rec.put("reverse", row.reverse());
                                 rec.put("identity", row.identity());
+                                return rec;
+                            })
+                            .toList());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/clones")
+    public Mono<Map<String, Object>> findClones(
+            @RequestParam("text") String text,
+            @RequestParam(name = "wrap", defaultValue = "70") int wrapWidth) {
+        return Mono.fromCallable(() -> {
+                    var scan = clones.scan(text, wrapWidth);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("wrapWidth", scan.wrapWidth());
+                    body.put("scanned", scan.scanned());
+                    body.put("distinct", scan.distinct());
+                    body.put("cloneGroups", scan.cloneGroups());
+                    body.put("cloneFrames", scan.cloneFrames());
+                    body.put("topCount", scan.topCount());
+                    body.put("hits", scan.hits().stream()
+                            .map(hit -> {
+                                Map<String, Object> rec = new LinkedHashMap<>();
+                                rec.put("firstOffset", hit.firstOffset());
+                                rec.put("count", hit.count());
+                                rec.put("preview", hit.preview());
                                 return rec;
                             })
                             .toList());

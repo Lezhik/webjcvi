@@ -130,6 +130,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/seam");
                     assertThat(html).contains("/phase");
                     assertThat(html).contains("/fields");
+                    assertThat(html).contains("/clones");
                 });
     }
 
@@ -757,6 +758,48 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void clonesApiFindsDuplicateFrames() {
+        String frame = "A".repeat(70);
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/clones")
+                        .queryParam("text", frame + frame)
+                        .queryParam("wrap", "70")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.cloneGroups").isEqualTo(1)
+                .jsonPath("$.cloneFrames").isEqualTo(2)
+                .jsonPath("$.hits[0].count").isEqualTo(2);
+    }
+
+    @Test
+    void clonesPageRenders() {
+        webTestClient.get()
+                .uri("/clones")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Clone frames"));
+    }
+
+    @Test
+    void clonesPageFormFindsDuplicateFrames() {
+        String frame = "A".repeat(70);
+        webTestClient.post()
+                .uri("/clones")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=" + frame + frame + "&wrap=70")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("cloneGroups=1");
+                    assertThat(html).contains("cloneFrames=2");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -781,6 +824,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.mirrors.jointCount").isNumber()
                 .jsonPath("$.seams.hitCount").isNumber()
                 .jsonPath("$.phase.hitCount").isNumber()
-                .jsonPath("$.fields.recordCount").isNumber();
+                .jsonPath("$.fields.recordCount").isNumber()
+                .jsonPath("$.clones.cloneGroups").isNumber();
     }
 }

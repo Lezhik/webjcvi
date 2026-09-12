@@ -24,6 +24,7 @@ import org.webjcvi.mirror.MirrorException;
 import org.webjcvi.seam.SeamException;
 import org.webjcvi.phase.PhaseException;
 import org.webjcvi.frame.FrameException;
+import org.webjcvi.clone.CloneException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
@@ -116,6 +117,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> frame(FrameException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "frame", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(CloneException.class)
+    ResponseEntity<Map<String, String>> clone(CloneException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "clone", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

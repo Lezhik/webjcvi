@@ -20,6 +20,7 @@ import org.webjcvi.mirror.MirrorJoint;
 import org.webjcvi.seam.SeamGuard;
 import org.webjcvi.phase.PhaseJoint;
 import org.webjcvi.frame.FrameFields;
+import org.webjcvi.clone.CloneScan;
 
 /**
  * Fixed-API facade over the text-processing algorithms for log analysis.
@@ -51,12 +52,13 @@ public final class LogAnalysisService {
     private final SeamGuard seams;
     private final PhaseJoint phase;
     private final FrameFields fields;
+    private final CloneScan clones;
 
     public LogAnalysisService() {
         this(new BannerSplitter(), new PairDrift(), new WrapReflow(), new RareClassScanner(),
                 new RareBreakTokenizer(), new KmerStamp(), new PalindromeScan(), new StemLoop(),
                 new FuzzyFind(), new BlockContrast(), new MirrorJoint(), new SeamGuard(),
-                new PhaseJoint(), new FrameFields());
+                new PhaseJoint(), new FrameFields(), new CloneScan());
     }
 
     public LogAnalysisService(
@@ -73,7 +75,8 @@ public final class LogAnalysisService {
             MirrorJoint mirrors,
             SeamGuard seams,
             PhaseJoint phase,
-            FrameFields fields) {
+            FrameFields fields,
+            CloneScan clones) {
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
@@ -88,6 +91,7 @@ public final class LogAnalysisService {
         this.seams = seams;
         this.phase = phase;
         this.fields = fields;
+        this.clones = clones;
     }
 
     /**
@@ -214,6 +218,15 @@ public final class LogAnalysisService {
                 fieldScan.topReverse(),
                 fieldScan.topIdentity());
 
+        var cloneScan = clones.scan(payload);
+        var cloneSection = new LogAnalysisReport.CloneSection(
+                cloneScan.scanned(),
+                cloneScan.distinct(),
+                cloneScan.cloneGroups(),
+                cloneScan.cloneFrames(),
+                cloneScan.topCount(),
+                cloneScan.wrapWidth());
+
         LogAnalysisReport report = new LogAnalysisReport(
                 API_VERSION,
                 inputLength,
@@ -232,9 +245,10 @@ public final class LogAnalysisService {
                 mirrorSection,
                 seamSection,
                 phaseSection,
-                fieldSection);
+                fieldSection,
+                cloneSection);
         if (log.isDebugEnabled()) {
-            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={}",
+            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={}",
                     truncated,
                     tapeSection.runCount(),
                     bannerSection.sectionCount(),
@@ -248,7 +262,8 @@ public final class LogAnalysisService {
                     mirrorSection.jointCount(),
                     seamSection.hitCount(),
                     phaseSection.hitCount(),
-                    fieldSection.recordCount());
+                    fieldSection.recordCount(),
+                    cloneSection.cloneGroups());
         }
         return report;
     }
