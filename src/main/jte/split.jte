@@ -25,7 +25,7 @@
     </style>
 </head>
 <body>
-    <nav><a href="/">← Home</a> · <a href="/tape">Scratch tape</a> · <a href="/drift">Pair drift</a></nav>
+    <nav><a href="/">← Home</a> · <a href="/tape">Scratch tape</a> · <a href="/drift">Pair drift</a> · <a href="/reflow">Unwrap</a></nav>
     <h1>Banner split</h1>
     <p>Splits caller-supplied text on unusually long identical-character runs
         (log banners such as <code>==========</code> or <code>----------</code>).

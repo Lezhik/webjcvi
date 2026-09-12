@@ -118,6 +118,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/tape");
                     assertThat(html).contains("/split");
                     assertThat(html).contains("/drift");
+                    assertThat(html).contains("/reflow");
                 });
     }
 
@@ -238,6 +239,48 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("hotspot");
                     assertThat(html).contains("opens 10");
                     assertThat(html).contains("closes 10");
+                });
+    }
+
+    @Test
+    void reflowApiStitchesFullWidthLines() {
+        String wrapped = "a".repeat(70) + "\ncontinues";
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/reflow")
+                        .queryParam("text", wrapped)
+                        .queryParam("width", "70")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.stitches").isEqualTo(1)
+                .jsonPath("$.paragraphCount").isEqualTo(1)
+                .jsonPath("$.paragraphs[0].length").isEqualTo(80);
+    }
+
+    @Test
+    void reflowPageRenders() {
+        webTestClient.get()
+                .uri("/reflow")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Unwrap hard wrap"));
+    }
+
+    @Test
+    void reflowPageFormStitchesFullWidthLines() {
+        String body = "text=" + "a".repeat(70) + "%0Acontinues&width=70";
+        webTestClient.post()
+                .uri("/reflow")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue(body)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("1 paragraph");
+                    assertThat(html).contains("continues");
                 });
     }
 }

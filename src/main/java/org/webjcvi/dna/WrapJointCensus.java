@@ -20,18 +20,21 @@ public final class WrapJointCensus {
     private final String topJoint;
     private final long topJointCount;
     private final Map<String, Long> topJoints;
+    private final Map<String, Long> allJoints;
 
     private WrapJointCensus(
             int jointCount,
             int complementaryJoints,
             String topJoint,
             long topJointCount,
-            Map<String, Long> topJoints) {
+            Map<String, Long> topJoints,
+            Map<String, Long> allJoints) {
         this.jointCount = jointCount;
         this.complementaryJoints = complementaryJoints;
         this.topJoint = topJoint;
         this.topJointCount = topJointCount;
         this.topJoints = Collections.unmodifiableMap(new LinkedHashMap<>(topJoints));
+        this.allJoints = Collections.unmodifiableMap(new LinkedHashMap<>(allJoints));
     }
 
     public static WrapJointCensus fromRaw(String raw) {
@@ -70,7 +73,7 @@ public final class WrapJointCensus {
         }
         String best = ranked.isEmpty() ? "" : ranked.getFirst().getKey();
         long bestCount = ranked.isEmpty() ? 0L : ranked.getFirst().getValue();
-        return new WrapJointCensus(joints, complementary, best, bestCount, top);
+        return new WrapJointCensus(joints, complementary, best, bestCount, top, counts);
     }
 
     private static List<String> lines(String raw) {
@@ -120,6 +123,10 @@ public final class WrapJointCensus {
 
     public Map<String, Long> topJoints() {
         return topJoints;
+    }
+
+    public Map<String, Long> allJoints() {
+        return allJoints;
     }
 
     public String toTextRow() {

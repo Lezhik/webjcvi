@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.webjcvi.drift.DriftException;
+import org.webjcvi.reflow.ReflowException;
 import org.webjcvi.segment.SegmentException;
 import org.webjcvi.storage.FileSizeLimitException;
 import org.webjcvi.storage.PathEscapeException;
@@ -32,6 +33,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> drift(DriftException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "drift", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(ReflowException.class)
+    ResponseEntity<Map<String, String>> reflow(ReflowException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "reflow", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

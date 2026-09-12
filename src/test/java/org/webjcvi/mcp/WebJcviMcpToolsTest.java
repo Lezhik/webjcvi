@@ -41,6 +41,7 @@ class WebJcviMcpToolsTest {
                         "tape_runs",
                         "split_banners",
                         "pair_drift",
+                        "unwrap_wraps",
                         "list_files",
                         "read_file");
     }
@@ -89,8 +90,8 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Skew-island geography");
-        assertThat(markdown).contains("Wrap-joint dinucleotides");
+        assertThat(markdown).contains("Joint vs global dimers");
+        assertThat(markdown).contains("Frame remainder");
     }
 
     @Test
@@ -119,5 +120,16 @@ class WebJcviMcpToolsTest {
         assertThat(result).contains("hotspots=2");
         assertThat(result).doesNotContain("hidden");
         assertThat(tools.readFile("secret.txt")).isEqualTo("((((((((((hidden))))))))))");
+    }
+
+    @Test
+    void unwrapWrapsDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "hidden-wrap");
+        String wrapped = "a".repeat(70) + "\ncontinues";
+        String result = tools.unwrapWraps(wrapped, 70);
+        assertThat(result).contains("stitches=1");
+        assertThat(result).contains("continues");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("hidden-wrap");
     }
 }

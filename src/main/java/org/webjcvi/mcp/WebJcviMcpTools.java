@@ -15,6 +15,8 @@ import org.webjcvi.tape.ScratchTape;
 import org.webjcvi.tape.TapeException;
 import org.webjcvi.drift.DriftException;
 import org.webjcvi.drift.PairDrift;
+import org.webjcvi.reflow.ReflowException;
+import org.webjcvi.reflow.WrapReflow;
 
 /**
  * MCP tool surface. File tools go through {@link FileStorageService}. The
@@ -29,9 +31,10 @@ public class WebJcviMcpTools {
     private final ScratchTape tape;
     private final BannerSplitter splitter;
     private final PairDrift drift;
+    private final WrapReflow reflow;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
-        this(storage, reports, new ScratchTape(), new BannerSplitter(), new PairDrift());
+        this(storage, reports, new ScratchTape(), new BannerSplitter(), new PairDrift(), new WrapReflow());
     }
 
     @Autowired
@@ -40,12 +43,14 @@ public class WebJcviMcpTools {
             DnaReportService reports,
             ScratchTape tape,
             BannerSplitter splitter,
-            PairDrift drift) {
+            PairDrift drift,
+            WrapReflow reflow) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
         this.splitter = splitter;
         this.drift = drift;
+        this.reflow = reflow;
     }
 
     @Tool(name = "regenerate_dna_report", description = "Clear prior reports and rebuild the DNA report from jcvi-dna.txt and the current codebase.")
@@ -159,6 +164,32 @@ public class WebJcviMcpTools {
         });
     }
 
+    @Tool(name = "unwrap_wraps", description = "Unwrap hard-wrapped caller text: join lines of at least the wrap width (default 70); a shorter line ends the paragraph. Not the DNA file and not a project path.")
+    public String unwrapWraps(
+            @ToolParam(description = "Hard-wrapped text") String text,
+            @ToolParam(description = "Wrap width; use 70 unless the paste used a different column") int width) {
+        return run(() -> {
+            int frame = width < 8 ? WrapReflow.DEFAULT_WIDTH : width;
+            var result = reflow.unwrap(text, frame);
+            StringBuilder out = new StringBuilder();
+            out.append("paragraphs=").append(result.paragraphCount())
+                    .append(" stitches=").append(result.stitches())
+                    .append(" lines=").append(result.sourceLines())
+                    .append('\n');
+            if (result.paragraphs().isEmpty()) {
+                out.append("(no paragraphs)");
+                return out.toString();
+            }
+            for (var para : result.paragraphs()) {
+                out.append("#").append(para.index())
+                        .append(" length ").append(para.length())
+                        .append('\n')
+                        .append(para.preview()).append('\n');
+            }
+            return out.toString();
+        });
+    }
+
     @Tool(name = "list_files", description = "List files inside the project directory. Paths must be relative to the project root.")
     public String listFiles(
             @ToolParam(description = "Relative directory to list, or '.' for the project root") String path,
@@ -182,7 +213,7 @@ public class WebJcviMcpTools {
     private static String run(ToolAction action) {
         try {
             return action.execute();
-        } catch (StorageException | TapeException | SegmentException | DriftException e) {
+        } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException e) {
             return "Error: " + e.getMessage();
         }
     }

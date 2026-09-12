@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.webjcvi.drift.PairDrift;
+import org.webjcvi.reflow.WrapReflow;
 import org.webjcvi.report.DnaReport;
 import org.webjcvi.report.DnaReportService;
 import org.webjcvi.segment.BannerSplitter;
@@ -32,18 +33,21 @@ public class WorkspaceApiController {
     private final ScratchTape tape;
     private final BannerSplitter splitter;
     private final PairDrift drift;
+    private final WrapReflow wrapReflow;
 
     public WorkspaceApiController(
             FileStorageService storage,
             DnaReportService reports,
             ScratchTape tape,
             BannerSplitter splitter,
-            PairDrift drift) {
+            PairDrift drift,
+            WrapReflow wrapReflow) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
         this.splitter = splitter;
         this.drift = drift;
+        this.wrapReflow = wrapReflow;
     }
 
     @GetMapping("/files")
@@ -174,6 +178,31 @@ public class WorkspaceApiController {
                                 row.put("closes", hit.closes());
                                 row.put("skew", hit.skew());
                                 row.put("preview", hit.preview());
+                                return row;
+                            })
+                            .toList());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/reflow")
+    public Mono<Map<String, Object>> reflow(
+            @RequestParam("text") String text,
+            @RequestParam(name = "width", defaultValue = "70") int width) {
+        return Mono.fromCallable(() -> {
+                    var result = wrapReflow.unwrap(text, width);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("width", result.width());
+                    body.put("sourceLines", result.sourceLines());
+                    body.put("stitches", result.stitches());
+                    body.put("paragraphCount", result.paragraphCount());
+                    body.put("paragraphs", result.paragraphs().stream()
+                            .map(para -> {
+                                Map<String, Object> row = new LinkedHashMap<>();
+                                row.put("index", para.index());
+                                row.put("length", para.length());
+                                row.put("preview", para.preview());
                                 return row;
                             })
                             .toList());

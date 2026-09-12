@@ -36,6 +36,7 @@
         <p><a href="/tape">Open the scratch tape</a> (paste text, exact-find, list runs).</p>
         <p><a href="/split">Open banner split</a> (cut pasted logs on long character runs).</p>
         <p><a href="/drift">Open pair drift</a> (find local bracket imbalance in 70-char windows).</p>
+        <p><a href="/reflow">Unwrap hard wrap</a> (join lines of width 70 into paragraphs).</p>
         <form method="post" action="/report/regenerate">
             <button type="submit">Regenerate report</button>
         </form>
