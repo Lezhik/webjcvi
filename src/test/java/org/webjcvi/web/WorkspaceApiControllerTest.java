@@ -121,6 +121,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/reflow");
                     assertThat(html).contains("/rare");
                     assertThat(html).contains("/tokens");
+                    assertThat(html).contains("/stamps");
                 });
     }
 
@@ -362,6 +363,45 @@ class WorkspaceApiControllerTest {
                 .value(html -> {
                     assertThat(html).contains("2 token");
                     assertThat(html).contains("AAAAAAAAAA");
+                });
+    }
+
+    @Test
+    void stampsApiRanksOverlappingAaa() {
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/stamps")
+                        .queryParam("text", "aaa bbb aaa")
+                        .queryParam("k", "3")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.topKmer").isEqualTo("AAA")
+                .jsonPath("$.stamps[0].kmer").isEqualTo("AAA");
+    }
+
+    @Test
+    void stampsPageRenders() {
+        webTestClient.get()
+                .uri("/stamps")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("K-mer stamps"));
+    }
+
+    @Test
+    void stampsPageFormRanksOverlappingAaa() {
+        webTestClient.post()
+                .uri("/stamps")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=aaa+bbb+aaa&k=3")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("AAA");
+                    assertThat(html).contains("Top stamp");
                 });
     }
 }

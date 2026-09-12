@@ -44,6 +44,7 @@ class WebJcviMcpToolsTest {
                         "unwrap_wraps",
                         "rare_islands",
                         "cut_tokens",
+                        "kmer_stamps",
                         "list_files",
                         "read_file");
     }
@@ -92,7 +93,7 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Codon frames");
+        assertThat(markdown).contains("Same-base lags");
         assertThat(markdown).contains("Frame remainder");
     }
 
@@ -151,5 +152,14 @@ class WebJcviMcpToolsTest {
         assertThat(result).contains("AAAAAAAAAA");
         assertThat(result).doesNotContain("hidden");
         assertThat(tools.readFile("secret.txt")).isEqualTo("hidden-token");
+    }
+
+    @Test
+    void kmerStampsDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "hidden-stamp");
+        String result = tools.kmerStamps("aaa bbb aaa", 3);
+        assertThat(result).contains("AAA");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("hidden-stamp");
     }
 }

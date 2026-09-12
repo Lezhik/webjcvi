@@ -13,6 +13,7 @@ import org.webjcvi.drift.PairDrift;
 import org.webjcvi.rare.RareClassScanner;
 import org.webjcvi.reflow.WrapReflow;
 import org.webjcvi.token.RareBreakTokenizer;
+import org.webjcvi.stamp.KmerStamp;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -61,6 +62,11 @@ public class WebJcviConfiguration {
     @Bean
     RareBreakTokenizer rareBreakTokenizer(RareClassScanner rareClassScanner) {
         return new RareBreakTokenizer(rareClassScanner);
+    }
+
+    @Bean
+    KmerStamp kmerStamp() {
+        return new KmerStamp();
     }
 
     @Bean

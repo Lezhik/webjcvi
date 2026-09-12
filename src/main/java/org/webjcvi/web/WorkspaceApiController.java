@@ -13,6 +13,7 @@ import org.webjcvi.drift.PairDrift;
 import org.webjcvi.rare.RareClassScanner;
 import org.webjcvi.reflow.WrapReflow;
 import org.webjcvi.token.RareBreakTokenizer;
+import org.webjcvi.stamp.KmerStamp;
 import org.webjcvi.report.DnaReport;
 import org.webjcvi.report.DnaReportService;
 import org.webjcvi.segment.BannerSplitter;
@@ -38,6 +39,7 @@ public class WorkspaceApiController {
     private final WrapReflow wrapReflow;
     private final RareClassScanner rareScanner;
     private final RareBreakTokenizer tokenizer;
+    private final KmerStamp stamp;
 
     public WorkspaceApiController(
             FileStorageService storage,
@@ -47,7 +49,8 @@ public class WorkspaceApiController {
             PairDrift drift,
             WrapReflow wrapReflow,
             RareClassScanner rareScanner,
-            RareBreakTokenizer tokenizer) {
+            RareBreakTokenizer tokenizer,
+            KmerStamp stamp) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
@@ -56,6 +59,7 @@ public class WorkspaceApiController {
         this.wrapReflow = wrapReflow;
         this.rareScanner = rareScanner;
         this.tokenizer = tokenizer;
+        this.stamp = stamp;
     }
 
     @GetMapping("/files")
@@ -263,6 +267,32 @@ public class WorkspaceApiController {
                                 row.put("length", token.length());
                                 row.put("preview", token.preview());
                                 return row;
+                            })
+                            .toList());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/stamps")
+    public Mono<Map<String, Object>> kmerStamps(
+            @RequestParam("text") String text,
+            @RequestParam(name = "k", defaultValue = "3") int k) {
+        return Mono.fromCallable(() -> {
+                    var census = stamp.rank(text, k);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("k", census.k());
+                    body.put("scanned", census.scanned());
+                    body.put("distinct", census.distinct());
+                    body.put("topKmer", census.topKmer());
+                    body.put("topCount", census.topCount());
+                    body.put("stamps", census.stamps().stream()
+                            .map(row -> {
+                                Map<String, Object> item = new LinkedHashMap<>();
+                                item.put("index", row.index());
+                                item.put("kmer", row.kmer());
+                                item.put("count", row.count());
+                                return item;
                             })
                             .toList());
                     return body;

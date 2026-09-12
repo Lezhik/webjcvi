@@ -27,7 +27,7 @@
     </style>
 </head>
 <body>
-    <nav><a href="/">← Home</a> · <a href="/tape">Scratch tape</a> · <a href="/split">Banner split</a> · <a href="/drift">Pair drift</a> · <a href="/rare">Rare islands</a> · <a href="/tokens">Tokens</a></nav>
+    <nav><a href="/">← Home</a> · <a href="/tape">Scratch tape</a> · <a href="/split">Banner split</a> · <a href="/drift">Pair drift</a> · <a href="/rare">Rare islands</a> · <a href="/tokens">Tokens</a> · <a href="/stamps">Stamps</a></nav>
     <h1>Unwrap hard wrap</h1>
     <p>Joins consecutive lines whose length is at least the DNA wrap frame
         (<strong>70</strong>). A shorter line ends the paragraph — the analog of FASTA

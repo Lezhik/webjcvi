@@ -21,6 +21,8 @@ import org.webjcvi.reflow.ReflowException;
 import org.webjcvi.reflow.WrapReflow;
 import org.webjcvi.token.RareBreakTokenizer;
 import org.webjcvi.token.TokenException;
+import org.webjcvi.stamp.KmerStamp;
+import org.webjcvi.stamp.StampException;
 
 /**
  * MCP tool surface. File tools go through {@link FileStorageService}. The
@@ -38,10 +40,11 @@ public class WebJcviMcpTools {
     private final WrapReflow reflow;
     private final RareClassScanner rare;
     private final RareBreakTokenizer tokenizer;
+    private final KmerStamp stamp;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
         this(storage, reports, new ScratchTape(), new BannerSplitter(), new PairDrift(),
-                new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer());
+                new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer(), new KmerStamp());
     }
 
     @Autowired
@@ -53,7 +56,8 @@ public class WebJcviMcpTools {
             PairDrift drift,
             WrapReflow reflow,
             RareClassScanner rare,
-            RareBreakTokenizer tokenizer) {
+            RareBreakTokenizer tokenizer,
+            KmerStamp stamp) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
@@ -62,6 +66,7 @@ public class WebJcviMcpTools {
         this.reflow = reflow;
         this.rare = rare;
         this.tokenizer = tokenizer;
+        this.stamp = stamp;
     }
 
     @Tool(name = "regenerate_dna_report", description = "Clear prior reports and rebuild the DNA report from jcvi-dna.txt and the current codebase.")
@@ -247,6 +252,28 @@ public class WebJcviMcpTools {
         });
     }
 
+    @Tool(name = "kmer_stamps", description = "Rank overlapping k-mers (default k=3) in caller-supplied text after folding case and dropping whitespace. Lists the most common short stamps. Not the DNA file and not a project path.")
+    public String kmerStamps(
+            @ToolParam(description = "Arbitrary text to rank") String text,
+            @ToolParam(description = "k-mer width; use 3 unless you need a different stamp size") int k) {
+        return run(() -> {
+            int width = k < 2 ? KmerStamp.DEFAULT_K : k;
+            var census = stamp.rank(text, width);
+            StringBuilder out = new StringBuilder(census.summary()).append('\n');
+            if (census.stamps().isEmpty()) {
+                out.append("(no stamps)");
+                return out.toString();
+            }
+            for (var row : census.stamps()) {
+                out.append("#").append(row.index())
+                        .append(" ").append(row.kmer())
+                        .append(" x").append(row.count())
+                        .append('\n');
+            }
+            return out.toString();
+        });
+    }
+
     @Tool(name = "list_files", description = "List files inside the project directory. Paths must be relative to the project root.")
     public String listFiles(
             @ToolParam(description = "Relative directory to list, or '.' for the project root") String path,
@@ -271,7 +298,7 @@ public class WebJcviMcpTools {
         try {
             return action.execute();
         } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException
-                 | RareException | TokenException e) {
+                 | RareException | TokenException | StampException e) {
             return "Error: " + e.getMessage();
         }
     }

@@ -15,6 +15,7 @@ import org.webjcvi.storage.StorageException;
 import org.webjcvi.storage.StorageNotFoundException;
 import org.webjcvi.tape.TapeException;
 import org.webjcvi.token.TokenException;
+import org.webjcvi.stamp.StampException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
@@ -53,6 +54,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> token(TokenException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "token", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(StampException.class)
+    ResponseEntity<Map<String, String>> stamp(StampException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "stamp", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)
