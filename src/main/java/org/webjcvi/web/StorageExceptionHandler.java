@@ -19,6 +19,7 @@ import org.webjcvi.stamp.StampException;
 import org.webjcvi.fold.FoldException;
 import org.webjcvi.loop.LoopException;
 import org.webjcvi.fuzzy.FuzzyException;
+import org.webjcvi.contrast.ContrastException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
@@ -81,6 +82,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> fuzzy(FuzzyException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "fuzzy", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(ContrastException.class)
+    ResponseEntity<Map<String, String>> contrast(ContrastException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "contrast", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

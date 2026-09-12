@@ -125,6 +125,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/fold");
                     assertThat(html).contains("/loop");
                     assertThat(html).contains("/fuzzy");
+                    assertThat(html).contains("/contrast");
                 });
     }
 
@@ -530,6 +531,47 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void contrastApiFlagsRepeatedBlocks() {
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/contrast")
+                        .queryParam("text", "abcdabcd")
+                        .queryParam("width", "4")
+                        .queryParam("flag", "1")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.stutterCount").isEqualTo(1)
+                .jsonPath("$.hits[0].left").isEqualTo("ABCD")
+                .jsonPath("$.hits[0].right").isEqualTo("ABCD");
+    }
+
+    @Test
+    void contrastPageRenders() {
+        webTestClient.get()
+                .uri("/contrast")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Block contrast"));
+    }
+
+    @Test
+    void contrastPageFormFlagsRepeatedBlocks() {
+        webTestClient.post()
+                .uri("/contrast")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=abcdabcd&width=4&flag=1")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("ABCD");
+                    assertThat(html).contains("stutter");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -549,6 +591,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.stamps.k").isNumber()
                 .jsonPath("$.palindromes.hitCount").isNumber()
                 .jsonPath("$.spans.spanCount").isNumber()
-                .jsonPath("$.fuzzy.skipped").isBoolean();
+                .jsonPath("$.fuzzy.skipped").isBoolean()
+                .jsonPath("$.contrast.stutterCount").isNumber();
     }
 }

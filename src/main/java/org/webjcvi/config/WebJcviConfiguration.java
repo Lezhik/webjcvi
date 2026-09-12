@@ -18,6 +18,7 @@ import org.webjcvi.fold.PalindromeScan;
 import org.webjcvi.loop.StemLoop;
 import org.webjcvi.fuzzy.FuzzyFind;
 import org.webjcvi.logs.LogAnalysisService;
+import org.webjcvi.contrast.BlockContrast;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -86,6 +87,11 @@ public class WebJcviConfiguration {
     @Bean
     FuzzyFind fuzzyFind() {
         return new FuzzyFind();
+    }
+
+    @Bean
+    BlockContrast blockContrast() {
+        return new BlockContrast();
     }
 
     @Bean

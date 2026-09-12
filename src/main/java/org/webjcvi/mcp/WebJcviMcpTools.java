@@ -29,6 +29,8 @@ import org.webjcvi.loop.LoopException;
 import org.webjcvi.loop.StemLoop;
 import org.webjcvi.fuzzy.FuzzyException;
 import org.webjcvi.fuzzy.FuzzyFind;
+import org.webjcvi.contrast.BlockContrast;
+import org.webjcvi.contrast.ContrastException;
 import org.webjcvi.logs.LogAnalysisService;
 
 /**
@@ -51,12 +53,14 @@ public class WebJcviMcpTools {
     private final PalindromeScan palindromes;
     private final StemLoop loops;
     private final FuzzyFind fuzzy;
+    private final BlockContrast contrast;
     private final LogAnalysisService logAnalysis;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
         this(storage, reports, new ScratchTape(), new BannerSplitter(), new PairDrift(),
                 new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer(), new KmerStamp(),
-                new PalindromeScan(), new StemLoop(), new FuzzyFind(), new LogAnalysisService());
+                new PalindromeScan(), new StemLoop(), new FuzzyFind(), new BlockContrast(),
+                new LogAnalysisService());
     }
 
     @Autowired
@@ -73,6 +77,7 @@ public class WebJcviMcpTools {
             PalindromeScan palindromes,
             StemLoop loops,
             FuzzyFind fuzzy,
+            BlockContrast contrast,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -86,6 +91,7 @@ public class WebJcviMcpTools {
         this.palindromes = palindromes;
         this.loops = loops;
         this.fuzzy = fuzzy;
+        this.contrast = contrast;
         this.logAnalysis = logAnalysis;
     }
 
@@ -365,6 +371,31 @@ public class WebJcviMcpTools {
         });
     }
 
+    @Tool(name = "block_contrast", description = "Find adjacent-window Hamming stutters in caller-supplied text. Default width 4, flag distance ≤ 1. Neighbors should differ (DNA distance 0 is depleted). Not the DNA file and not a project path.")
+    public String blockContrast(
+            @ToolParam(description = "Arbitrary text to scan") String text,
+            @ToolParam(description = "Window width; use 4 unless you need a different floor") int width,
+            @ToolParam(description = "Flag Hamming distances at or below this; use 1 unless you need a different floor") int flagMax) {
+        return run(() -> {
+            int w = width < 2 ? BlockContrast.DEFAULT_WIDTH : width;
+            int cap = flagMax < 0 ? BlockContrast.DEFAULT_FLAG_MAX : flagMax;
+            var scan = contrast.scan(text, w, cap);
+            StringBuilder out = new StringBuilder(scan.summary()).append('\n');
+            if (scan.hits().isEmpty()) {
+                out.append("(no stutters)");
+                return out.toString();
+            }
+            for (var hit : scan.hits()) {
+                out.append("#").append(hit.index())
+                        .append(" offset ").append(hit.offset())
+                        .append(" distance ").append(hit.distance())
+                        .append('\n')
+                        .append(hit.left()).append(" | ").append(hit.right()).append('\n');
+            }
+            return out.toString();
+        });
+    }
+
     @Tool(name = "analyze_logs", description = "Analyze caller-supplied log text with the shared log-analysis facade. Returns a JSON report. Not the DNA file. Truncates at 524288 characters.")
     public String analyzeLogs(
             @ToolParam(description = "Log text to analyze") String text) {
@@ -396,7 +427,7 @@ public class WebJcviMcpTools {
             return action.execute();
         } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException
                  | RareException | TokenException | StampException | FoldException | LoopException
-                 | FuzzyException e) {
+                 | FuzzyException | ContrastException e) {
             return "Error: " + e.getMessage();
         }
     }

@@ -43,6 +43,7 @@
         <p><a href="/fold">Fold palindromes</a> (even mirrored spans, not homopolymers).</p>
         <p><a href="/loop">Stem loops</a> (extract complementary bracket spans and the enclosed loop).</p>
         <p><a href="/fuzzy">Fuzzy find</a> (Hamming-near motif search — exact pairing is background).</p>
+        <p><a href="/contrast">Block contrast</a> (adjacent-window stutters — neighbors should differ).</p>
         <form method="post" action="/report/regenerate">
             <button type="submit">Regenerate report</button>
         </form>

@@ -17,6 +17,7 @@ import org.webjcvi.stamp.KmerStamp;
 import org.webjcvi.fold.PalindromeScan;
 import org.webjcvi.loop.StemLoop;
 import org.webjcvi.fuzzy.FuzzyFind;
+import org.webjcvi.contrast.BlockContrast;
 import org.webjcvi.logs.LogAnalysisReport;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.report.DnaReport;
@@ -48,6 +49,7 @@ public class WorkspaceApiController {
     private final PalindromeScan palindromes;
     private final StemLoop loops;
     private final FuzzyFind fuzzy;
+    private final BlockContrast contrast;
     private final LogAnalysisService logAnalysis;
 
     public WorkspaceApiController(
@@ -63,6 +65,7 @@ public class WorkspaceApiController {
             PalindromeScan palindromes,
             StemLoop loops,
             FuzzyFind fuzzy,
+            BlockContrast contrast,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -76,6 +79,7 @@ public class WorkspaceApiController {
         this.palindromes = palindromes;
         this.loops = loops;
         this.fuzzy = fuzzy;
+        this.contrast = contrast;
         this.logAnalysis = logAnalysis;
     }
 
@@ -392,6 +396,36 @@ public class WorkspaceApiController {
                                 row.put("offset", hit.offset());
                                 row.put("distance", hit.distance());
                                 row.put("preview", hit.preview());
+                                return row;
+                            })
+                            .toList());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/contrast")
+    public Mono<Map<String, Object>> blockContrast(
+            @RequestParam("text") String text,
+            @RequestParam(name = "width", defaultValue = "4") int width,
+            @RequestParam(name = "flag", defaultValue = "1") int flagMax) {
+        return Mono.fromCallable(() -> {
+                    var scan = contrast.scan(text, width, flagMax);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("width", scan.width());
+                    body.put("scanned", scan.scanned());
+                    body.put("stutterCount", scan.stutterCount());
+                    body.put("modalDistance", scan.modalDistance());
+                    body.put("meanDistance", scan.meanDistance());
+                    body.put("flagMax", scan.flagMax());
+                    body.put("hits", scan.hits().stream()
+                            .map(hit -> {
+                                Map<String, Object> row = new LinkedHashMap<>();
+                                row.put("index", hit.index());
+                                row.put("offset", hit.offset());
+                                row.put("distance", hit.distance());
+                                row.put("left", hit.left());
+                                row.put("right", hit.right());
                                 return row;
                             })
                             .toList());

@@ -15,6 +15,7 @@ import org.webjcvi.stamp.KmerStamp;
 import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.tape.ScratchTape;
 import org.webjcvi.token.RareBreakTokenizer;
+import org.webjcvi.contrast.BlockContrast;
 
 /**
  * Fixed-API facade over the text-processing algorithms for log analysis.
@@ -41,11 +42,12 @@ public final class LogAnalysisService {
     private final PalindromeScan palindromes;
     private final StemLoop loops;
     private final FuzzyFind fuzzy;
+    private final BlockContrast contrast;
 
     public LogAnalysisService() {
         this(new BannerSplitter(), new PairDrift(), new WrapReflow(), new RareClassScanner(),
                 new RareBreakTokenizer(), new KmerStamp(), new PalindromeScan(), new StemLoop(),
-                new FuzzyFind());
+                new FuzzyFind(), new BlockContrast());
     }
 
     public LogAnalysisService(
@@ -57,7 +59,8 @@ public final class LogAnalysisService {
             KmerStamp stamp,
             PalindromeScan palindromes,
             StemLoop loops,
-            FuzzyFind fuzzy) {
+            FuzzyFind fuzzy,
+            BlockContrast contrast) {
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
@@ -67,6 +70,7 @@ public final class LogAnalysisService {
         this.palindromes = palindromes;
         this.loops = loops;
         this.fuzzy = fuzzy;
+        this.contrast = contrast;
     }
 
     /**
@@ -155,6 +159,14 @@ public final class LogAnalysisService {
                     false);
         }
 
+        var contrastScan = contrast.scan(payload);
+        var contrastSection = new LogAnalysisReport.ContrastSection(
+                contrastScan.scanned(),
+                contrastScan.stutterCount(),
+                contrastScan.modalDistance(),
+                contrastScan.meanDistance(),
+                contrastScan.flagMax());
+
         LogAnalysisReport report = new LogAnalysisReport(
                 API_VERSION,
                 inputLength,
@@ -168,9 +180,10 @@ public final class LogAnalysisService {
                 stampSection,
                 palindromeSection,
                 spanSection,
-                fuzzySection);
+                fuzzySection,
+                contrastSection);
         if (log.isDebugEnabled()) {
-            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={}",
+            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={}",
                     truncated,
                     tapeSection.runCount(),
                     bannerSection.sectionCount(),
@@ -179,7 +192,8 @@ public final class LogAnalysisService {
                     stampSection.distinct(),
                     palindromeSection.hitCount(),
                     spanSection.spanCount(),
-                    fuzzySection.hitCount());
+                    fuzzySection.hitCount(),
+                    contrastSection.stutterCount());
         }
         return report;
     }
