@@ -119,6 +119,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/split");
                     assertThat(html).contains("/drift");
                     assertThat(html).contains("/reflow");
+                    assertThat(html).contains("/rare");
                 });
     }
 
@@ -281,6 +282,45 @@ class WorkspaceApiControllerTest {
                 .value(html -> {
                     assertThat(html).contains("1 paragraph");
                     assertThat(html).contains("continues");
+                });
+    }
+
+    @Test
+    void rareApiFindsGcLikeIslands() {
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/rare")
+                        .queryParam("text", "AAAAAAAAAA GCGCGC AAAAAAAAAA")
+                        .queryParam("min", "3")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.islandCount").isEqualTo(1)
+                .jsonPath("$.islands[0].preview").isEqualTo("GCGCGC");
+    }
+
+    @Test
+    void rarePageRenders() {
+        webTestClient.get()
+                .uri("/rare")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Rare-class islands"));
+    }
+
+    @Test
+    void rarePageFormFindsGcLikeIslands() {
+        webTestClient.post()
+                .uri("/rare")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=AAAAAAAAAA+GCGCGC+AAAAAAAAAA&min=3")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("1 island");
+                    assertThat(html).contains("GCGCGC");
                 });
     }
 }

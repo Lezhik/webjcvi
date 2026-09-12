@@ -42,6 +42,7 @@ class WebJcviMcpToolsTest {
                         "split_banners",
                         "pair_drift",
                         "unwrap_wraps",
+                        "rare_islands",
                         "list_files",
                         "read_file");
     }
@@ -90,7 +91,7 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Joint vs global dimers");
+        assertThat(markdown).contains("AT vs GC islands");
         assertThat(markdown).contains("Frame remainder");
     }
 
@@ -131,5 +132,14 @@ class WebJcviMcpToolsTest {
         assertThat(result).contains("continues");
         assertThat(result).doesNotContain("hidden");
         assertThat(tools.readFile("secret.txt")).isEqualTo("hidden-wrap");
+    }
+
+    @Test
+    void rareIslandsDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "GCGCGC-hidden");
+        String result = tools.rareIslands("AAAAAAAAAA GCGCGC AAAAAAAAAA", 3);
+        assertThat(result).contains("GCGCGC");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("GCGCGC-hidden");
     }
 }

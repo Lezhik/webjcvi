@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.webjcvi.drift.PairDrift;
+import org.webjcvi.rare.RareClassScanner;
 import org.webjcvi.reflow.WrapReflow;
 import org.webjcvi.report.DnaReport;
 import org.webjcvi.report.DnaReportService;
@@ -34,6 +35,7 @@ public class WorkspaceApiController {
     private final BannerSplitter splitter;
     private final PairDrift drift;
     private final WrapReflow wrapReflow;
+    private final RareClassScanner rareScanner;
 
     public WorkspaceApiController(
             FileStorageService storage,
@@ -41,13 +43,15 @@ public class WorkspaceApiController {
             ScratchTape tape,
             BannerSplitter splitter,
             PairDrift drift,
-            WrapReflow wrapReflow) {
+            WrapReflow wrapReflow,
+            RareClassScanner rareScanner) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
         this.splitter = splitter;
         this.drift = drift;
         this.wrapReflow = wrapReflow;
+        this.rareScanner = rareScanner;
     }
 
     @GetMapping("/files")
@@ -203,6 +207,32 @@ public class WorkspaceApiController {
                                 row.put("index", para.index());
                                 row.put("length", para.length());
                                 row.put("preview", para.preview());
+                                return row;
+                            })
+                            .toList());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/rare")
+    public Mono<Map<String, Object>> rareIslands(
+            @RequestParam("text") String text,
+            @RequestParam(name = "min", defaultValue = "3") int minIsland) {
+        return Mono.fromCallable(() -> {
+                    var scan = rareScanner.scan(text, minIsland);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("rareClass", scan.rareClass());
+                    body.put("scanned", scan.scanned());
+                    body.put("rareSymbolCount", scan.rareSymbolCount());
+                    body.put("islandCount", scan.islandCount());
+                    body.put("islands", scan.islands().stream()
+                            .map(island -> {
+                                Map<String, Object> row = new LinkedHashMap<>();
+                                row.put("index", island.index());
+                                row.put("offset", island.offset());
+                                row.put("length", island.length());
+                                row.put("preview", island.preview());
                                 return row;
                             })
                             .toList());

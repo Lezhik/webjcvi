@@ -15,6 +15,8 @@ import org.webjcvi.tape.ScratchTape;
 import org.webjcvi.tape.TapeException;
 import org.webjcvi.drift.DriftException;
 import org.webjcvi.drift.PairDrift;
+import org.webjcvi.rare.RareClassScanner;
+import org.webjcvi.rare.RareException;
 import org.webjcvi.reflow.ReflowException;
 import org.webjcvi.reflow.WrapReflow;
 
@@ -32,9 +34,11 @@ public class WebJcviMcpTools {
     private final BannerSplitter splitter;
     private final PairDrift drift;
     private final WrapReflow reflow;
+    private final RareClassScanner rare;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
-        this(storage, reports, new ScratchTape(), new BannerSplitter(), new PairDrift(), new WrapReflow());
+        this(storage, reports, new ScratchTape(), new BannerSplitter(), new PairDrift(),
+                new WrapReflow(), new RareClassScanner());
     }
 
     @Autowired
@@ -44,13 +48,15 @@ public class WebJcviMcpTools {
             ScratchTape tape,
             BannerSplitter splitter,
             PairDrift drift,
-            WrapReflow reflow) {
+            WrapReflow reflow,
+            RareClassScanner rare) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
+        this.rare = rare;
     }
 
     @Tool(name = "regenerate_dna_report", description = "Clear prior reports and rebuild the DNA report from jcvi-dna.txt and the current codebase.")
@@ -190,6 +196,29 @@ public class WebJcviMcpTools {
         });
     }
 
+    @Tool(name = "rare_islands", description = "Find islands of the rare character class in caller-supplied text. The rare class is the bottom ~24.14% of symbol mass (GC analog). Not the DNA file and not a project path.")
+    public String rareIslands(
+            @ToolParam(description = "Arbitrary text to scan") String text,
+            @ToolParam(description = "Minimum island length; use 3 unless you need a different floor") int minIsland) {
+        return run(() -> {
+            int floor = minIsland < 2 ? RareClassScanner.DEFAULT_MIN_ISLAND : minIsland;
+            var scan = rare.scan(text, floor);
+            StringBuilder out = new StringBuilder(scan.summary()).append('\n');
+            if (scan.islands().isEmpty()) {
+                out.append("(no islands)");
+                return out.toString();
+            }
+            for (var island : scan.islands()) {
+                out.append("#").append(island.index())
+                        .append(" offset ").append(island.offset())
+                        .append(" length ").append(island.length())
+                        .append('\n')
+                        .append(island.preview()).append('\n');
+            }
+            return out.toString();
+        });
+    }
+
     @Tool(name = "list_files", description = "List files inside the project directory. Paths must be relative to the project root.")
     public String listFiles(
             @ToolParam(description = "Relative directory to list, or '.' for the project root") String path,
@@ -213,7 +242,8 @@ public class WebJcviMcpTools {
     private static String run(ToolAction action) {
         try {
             return action.execute();
-        } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException e) {
+        } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException
+                 | RareException e) {
             return "Error: " + e.getMessage();
         }
     }

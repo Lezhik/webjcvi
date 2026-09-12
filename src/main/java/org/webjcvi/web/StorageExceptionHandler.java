@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.webjcvi.drift.DriftException;
+import org.webjcvi.rare.RareException;
 import org.webjcvi.reflow.ReflowException;
 import org.webjcvi.segment.SegmentException;
 import org.webjcvi.storage.FileSizeLimitException;
@@ -39,6 +40,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> reflow(ReflowException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "reflow", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(RareException.class)
+    ResponseEntity<Map<String, String>> rare(RareException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "rare", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

@@ -28,7 +28,7 @@
     </style>
 </head>
 <body>
-    <nav><a href="/">← Home</a> · <a href="/split">Banner split</a> · <a href="/drift">Pair drift</a> · <a href="/reflow">Unwrap</a></nav>
+    <nav><a href="/">← Home</a> · <a href="/split">Banner split</a> · <a href="/drift">Pair drift</a> · <a href="/reflow">Unwrap</a> · <a href="/rare">Rare islands</a></nav>
     <h1>Scratch tape</h1>
     <p>Caller-supplied text only — not <code>jcvi-dna.txt</code>, not a project file.
         Search is fold-then-exact. Runs of identical characters are listed the same way the DNA preview showed poly-A/T.</p>

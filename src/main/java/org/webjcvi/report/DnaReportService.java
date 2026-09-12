@@ -15,6 +15,7 @@ import org.webjcvi.dna.DimerContrast;
 import org.webjcvi.dna.DnaParser;
 import org.webjcvi.dna.DnaSequence;
 import org.webjcvi.dna.FrameSkewCensus;
+import org.webjcvi.dna.GcIslandCensus;
 import org.webjcvi.dna.HomopolymerProfile;
 import org.webjcvi.dna.SkewIslandCensus;
 import org.webjcvi.dna.WrapCensus;
@@ -93,10 +94,11 @@ public final class DnaReportService {
         SkewIslandCensus islands = SkewIslandCensus.from(sequence, wraps.modalWidth());
         WrapJointCensus joints = WrapJointCensus.fromRaw(raw);
         DimerContrast dimers = DimerContrast.from(sequence, joints);
+        GcIslandCensus gcIslands = GcIslandCensus.from(sequence);
         Map<String, String> sections = buildSections(
-                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers);
+                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands);
         String markdown = renderMarkdown(
-                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers);
+                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands);
         storage.writeText(reportRelativePath(), markdown);
         return new DnaReport(generatedAt, sequence, sections, markdown);
     }
@@ -144,7 +146,8 @@ public final class DnaReportService {
             FrameSkewCensus skew,
             SkewIslandCensus islands,
             WrapJointCensus joints,
-            DimerContrast dimers) {
+            DimerContrast dimers,
+            GcIslandCensus gcIslands) {
         Map<String, String> sections = new LinkedHashMap<>();
         sections.put("meta", "generatedAt=" + ISO.format(generatedAt));
         sections.put("length", Integer.toString(sequence.length()));
@@ -153,11 +156,11 @@ public final class DnaReportService {
         sections.put("invalidTotal", Long.toString(sequence.invalidTotal()));
         sections.put("javaSourceCount", Integer.toString(javaSources.size()));
         sections.put("wrapModalWidth", Integer.toString(wraps.modalWidth()));
-        sections.put("sameBaseGlobalShare", String.format(Locale.ROOT, "%.1f", dimers.sameBaseGlobalShare()));
-        sections.put("sameBaseJointShare", String.format(Locale.ROOT, "%.1f", dimers.sameBaseJointShare()));
-        sections.put("mostEnrichedDimer", dimers.mostEnriched().isEmpty() ? "-" : dimers.mostEnriched());
-        sections.put("mostEnrichedValue", String.format(Locale.ROOT, "%.2f", dimers.mostEnrichedValue()));
-        sections.put("topWrapJoint", joints.topJoint().isEmpty() ? "-" : joints.topJoint());
+        sections.put("gcIslands", Integer.toString(gcIslands.gcIslands()));
+        sections.put("longestGcIsland", Integer.toString(gcIslands.longestGc()));
+        sections.put("gcIslandsAtLeast5", Integer.toString(gcIslands.gcIslandsAtLeast5()));
+        sections.put("atIslands", Integer.toString(gcIslands.atIslands()));
+        sections.put("longestAtIsland", Integer.toString(gcIslands.longestAt()));
         sections.put("longestHomopolymer", runs.longestBase() + "x" + runs.longestLength());
         return sections;
     }
@@ -172,14 +175,18 @@ public final class DnaReportService {
             FrameSkewCensus skew,
             SkewIslandCensus islands,
             WrapJointCensus joints,
-            DimerContrast dimers) {
+            DimerContrast dimers,
+            GcIslandCensus gcIslands) {
         StringBuilder md = new StringBuilder();
         md.append("# WebJCVI DNA Report\n\n");
         md.append("Generated at **").append(ISO.format(generatedAt.atOffset(ZoneOffset.UTC))).append("**.\n\n");
         md.append("This report is rebuilt from `").append(dnaRelativePath)
-                .append("` and a snapshot of the current codebase. Version 5 of the builder ")
-                .append("contrasts overlapping dinucleotides of the whole tape with dinucleotides ")
-                .append("sampled only at wrap joints — asking whether the glue is a special seam or just AT-rich background.\n\n");
+                .append("` and a snapshot of the current codebase. Version 6 of the builder ")
+                .append("counts two-class islands on the linear tape: consecutive GC (the minority ")
+                .append("mass, measured 24.14%) versus consecutive AT (the majority). Homopolymers ")
+                .append("count one letter; Chargaff windows mix both classes; joint dimers asked ")
+                .append("whether wrap seams were special (they were not). This census asks how ")
+                .append("the rare class clusters.\n\n");
 
         md.append("## Sequence composition\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
@@ -220,35 +227,19 @@ public final class DnaReportService {
         md.append("First ").append(PREVIEW_BASES).append(" normalized bases:\n\n```\n");
         md.append(sequence.preview(PREVIEW_BASES)).append("\n```\n\n");
 
-        md.append("## Joint vs global dimers\n\n");
-        md.append("Overlapping canonical dimers on the linear tape versus the 70-wide wrap joints. ")
-                .append("Enrichment is joint-share / global-share. Same-base dimers are AA/TT/GG/CC.\n\n");
+        md.append("## AT vs GC islands\n\n");
+        md.append("A GC island is a maximal run of G and C (mixed allowed). An AT island is a ")
+                .append("maximal run of A and T. Single-base homopolymers are a special case of ")
+                .append("these islands; mixed GC runs were never counted before.\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
-        md.append("| Global overlapping dimers | ").append(dimers.globalDimers()).append(" |\n");
-        md.append("| Wrap joints | ").append(dimers.jointCount()).append(" |\n");
-        md.append("| Same-base share (global) | ")
-                .append(String.format(Locale.ROOT, "%.1f%%", dimers.sameBaseGlobalShare())).append(" |\n");
-        md.append("| Same-base share (joints) | ")
-                .append(String.format(Locale.ROOT, "%.1f%%", dimers.sameBaseJointShare())).append(" |\n");
-        md.append("| Most enriched at joints | `")
-                .append(dimers.mostEnriched().isEmpty() ? "-" : dimers.mostEnriched())
-                .append("` × ")
-                .append(String.format(Locale.ROOT, "%.2f", dimers.mostEnrichedValue())).append(" |\n");
-        md.append("| Most depleted at joints | `")
-                .append(dimers.mostDepleted().isEmpty() ? "-" : dimers.mostDepleted())
-                .append("` × ")
-                .append(String.format(Locale.ROOT, "%.2f", dimers.mostDepletedValue())).append(" |\n\n");
-        if (!dimers.topEnriched().isEmpty()) {
-            md.append("| Dimer | Global % | Joint % | Enrichment |\n| --- | --- | --- | --- |\n");
-            for (var row : dimers.topEnriched()) {
-                md.append("| `").append(row.dimer()).append("` | ")
-                        .append(String.format(Locale.ROOT, "%.2f", row.globalShare() * 100.0)).append(" | ")
-                        .append(String.format(Locale.ROOT, "%.2f", row.jointShare() * 100.0)).append(" | ")
-                        .append(String.format(Locale.ROOT, "%.2f", row.enrichment())).append(" |\n");
-            }
-            md.append('\n');
-        }
-        md.append("`").append(dimers.toTextRow()).append("`\n\n");
+        md.append("| GC islands | ").append(gcIslands.gcIslands()).append(" |\n");
+        md.append("| Longest GC island | ").append(gcIslands.longestGc()).append(" |\n");
+        md.append("| GC islands of length ≥ 5 | ").append(gcIslands.gcIslandsAtLeast5()).append(" |\n");
+        md.append("| GC islands of length ≥ 10 | ").append(gcIslands.gcIslandsAtLeast10()).append(" |\n");
+        md.append("| GC bases inside islands | ").append(gcIslands.gcBasesInIslands()).append(" |\n");
+        md.append("| AT islands | ").append(gcIslands.atIslands()).append(" |\n");
+        md.append("| Longest AT island | ").append(gcIslands.longestAt()).append(" |\n\n");
+        md.append("`").append(gcIslands.toTextRow()).append("`\n\n");
 
         md.append("## Frame remainder\n\n");
         md.append("Wrap min/median/modal/max: ")
@@ -256,11 +247,17 @@ public final class DnaReportService {
                 .append(wraps.medianWidth()).append(" / ")
                 .append(wraps.modalWidth()).append(" / ")
                 .append(wraps.maxWidth())
-                .append(". Complementary joints **")
+                .append(". Joint vs global same-base dimers **")
+                .append(String.format(Locale.ROOT, "%.1f%%", dimers.sameBaseGlobalShare()))
+                .append(" / ")
+                .append(String.format(Locale.ROOT, "%.1f%%", dimers.sameBaseJointShare()))
+                .append("** (most enriched `")
+                .append(dimers.mostEnriched().isEmpty() ? "-" : dimers.mostEnriched())
+                .append("` × ")
+                .append(String.format(Locale.ROOT, "%.2f", dimers.mostEnrichedValue()))
+                .append("). Complementary joints **")
                 .append(String.format(Locale.ROOT, "%.1f%%", joints.complementaryShare()))
-                .append("**, top `")
-                .append(joints.topJoint().isEmpty() ? "-" : joints.topJoint())
-                .append("`. Skew islands fail/pass **")
+                .append("**. Skew islands fail/pass **")
                 .append(islands.failIslands()).append(" / ").append(islands.passIslands())
                 .append("** (longest fail ").append(islands.longestFail())
                 .append(", pass ").append(islands.longestPass())
@@ -274,7 +271,7 @@ public final class DnaReportService {
                 .append(runs.runs20plus()).append(".\n\n");
 
         md.append("## Extracted tape rules\n\n");
-        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers);
+        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands);
 
         md.append("## Codebase snapshot\n\n");
         md.append(javaSources.size()).append(" Java source files under `src/main/java`:\n\n");
@@ -289,21 +286,22 @@ public final class DnaReportService {
 
         md.append("## Growth notes for the next iteration\n\n");
         md.append("- Dominant canonical base: **").append(dominantBase(sequence)).append("**.\n");
-        md.append("- Wrap modal width **").append(wraps.modalWidth())
-                .append("**. Same-base dimers: global **")
+        md.append("- GC share **")
+                .append(String.format(Locale.ROOT, "%.2f%%", sequence.gcPercent()))
+                .append("**. GC islands **").append(gcIslands.gcIslands())
+                .append("**, longest **").append(gcIslands.longestGc())
+                .append("**, length ≥5 **").append(gcIslands.gcIslandsAtLeast5())
+                .append("**, length ≥10 **").append(gcIslands.gcIslandsAtLeast10())
+                .append("**. AT islands **").append(gcIslands.atIslands())
+                .append("**, longest **").append(gcIslands.longestAt())
+                .append("**. If mixed GC islands stay as short as single-base G/C homopolymers, ")
+                .append("the rare class does not cluster; the next hypothesis should look at ")
+                .append("island-length distribution or a different alphabet partition.\n");
+        md.append("- Wrap joints remain unspecial: same-base global **")
                 .append(String.format(Locale.ROOT, "%.1f%%", dimers.sameBaseGlobalShare()))
-                .append("**, joints **")
+                .append("** vs joints **")
                 .append(String.format(Locale.ROOT, "%.1f%%", dimers.sameBaseJointShare()))
-                .append("**. Most enriched at joints: `")
-                .append(dimers.mostEnriched().isEmpty() ? "-" : dimers.mostEnriched())
-                .append("` × ")
-                .append(String.format(Locale.ROOT, "%.2f", dimers.mostEnrichedValue()))
-                .append(". If seams are not special, the next hypothesis should abandon wrap-as-protocol.\n");
-        md.append("- Most depleted at joints: `")
-                .append(dimers.mostDepleted().isEmpty() ? "-" : dimers.mostDepleted())
-                .append("` × ")
-                .append(String.format(Locale.ROOT, "%.2f", dimers.mostDepletedValue()))
-                .append(".\n");
+                .append("**.\n");
         md.append("- Skew islands remain: fail/pass **")
                 .append(islands.failIslands()).append(" / ").append(islands.passIslands())
                 .append("**, longest fail **").append(islands.longestFail()).append("**.\n");
@@ -326,37 +324,36 @@ public final class DnaReportService {
             FrameSkewCensus skew,
             SkewIslandCensus islands,
             WrapJointCensus joints,
-            DimerContrast dimers) {
+            DimerContrast dimers,
+            GcIslandCensus gcIslands) {
         long a = sequence.canonicalCounts().getOrDefault('A', 0L);
         long t = sequence.canonicalCounts().getOrDefault('T', 0L);
-        md.append("1. **R1 Wrap is continuation, not a pair-close.** Modal width ")
-                .append(wraps.modalWidth())
-                .append(", complementary joints ")
-                .append(String.format(Locale.ROOT, "%.1f%%", joints.complementaryShare()))
-                .append(". Same-base dimers are ")
+        md.append("1. **R1 GC is the minority class.** GC% ")
+                .append(String.format(Locale.ROOT, "%.2f", sequence.gcPercent()))
+                .append(" of the tape; G+C never form the long single-base banners (homopolymer max G/C is short).\n");
+        md.append("2. **R2 Mixed GC still clusters as one island.** GC islands ")
+                .append(gcIslands.gcIslands())
+                .append(", longest ").append(gcIslands.longestGc())
+                .append(", ≥5 ").append(gcIslands.gcIslandsAtLeast5())
+                .append(", ≥10 ").append(gcIslands.gcIslandsAtLeast10())
+                .append(".\n");
+        md.append("3. **R3 AT is the majority payload.** AT islands ")
+                .append(gcIslands.atIslands())
+                .append(", longest ").append(gcIslands.longestAt())
+                .append(". Global A=").append(a).append(", T=").append(t).append(".\n");
+        md.append("4. **R4 Wrap joints were not a special seam.** Same-base dimers ")
                 .append(String.format(Locale.ROOT, "%.1f%%", dimers.sameBaseGlobalShare()))
                 .append(" globally vs ")
                 .append(String.format(Locale.ROOT, "%.1f%%", dimers.sameBaseJointShare()))
-                .append(" at joints.\n");
-        md.append("2. **R2 Joint enrichment.** Most enriched `")
-                .append(dimers.mostEnriched().isEmpty() ? "-" : dimers.mostEnriched())
-                .append("` × ")
-                .append(String.format(Locale.ROOT, "%.2f", dimers.mostEnrichedValue()))
-                .append("; most depleted `")
-                .append(dimers.mostDepleted().isEmpty() ? "-" : dimers.mostDepleted())
-                .append("` × ")
-                .append(String.format(Locale.ROOT, "%.2f", dimers.mostDepletedValue()))
-                .append(".\n");
-        md.append("3. **R3 A short line ends the block.** ").append(wraps.lineCount())
-                .append(" lines, min width ").append(wraps.minWidth())
-                .append(", max ").append(wraps.maxWidth())
-                .append(". Global A=").append(a).append(", T=").append(t).append(".\n");
-        md.append("4. **R4 Drift remainder.** Fail/pass islands ")
+                .append(" at joints; complementary joints ")
+                .append(String.format(Locale.ROOT, "%.1f%%", joints.complementaryShare()))
+                .append("; wrap modal ").append(wraps.modalWidth())
+                .append("; skew fail/pass ")
                 .append(islands.failIslands()).append("/").append(islands.passIslands())
-                .append("; homopolymer longest ")
-                .append(runs.longestBase()).append("×").append(runs.longestLength())
                 .append("; mean |AT-skew| ")
                 .append(String.format(Locale.ROOT, "%.4f", skew.meanAbsAtSkew()))
+                .append("; homopolymer longest ")
+                .append(runs.longestBase()).append("×").append(runs.longestLength())
                 .append(".\n\n");
     }
 

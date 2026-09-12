@@ -10,6 +10,7 @@ import org.webjcvi.segment.BannerSplitter;
 import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.tape.ScratchTape;
 import org.webjcvi.drift.PairDrift;
+import org.webjcvi.rare.RareClassScanner;
 import org.webjcvi.reflow.WrapReflow;
 
 @Configuration
@@ -49,6 +50,11 @@ public class WebJcviConfiguration {
     @Bean
     WrapReflow wrapReflow() {
         return new WrapReflow();
+    }
+
+    @Bean
+    RareClassScanner rareClassScanner() {
+        return new RareClassScanner();
     }
 
     @Bean
