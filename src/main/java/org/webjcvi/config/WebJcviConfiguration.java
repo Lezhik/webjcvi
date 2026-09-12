@@ -19,6 +19,7 @@ import org.webjcvi.loop.StemLoop;
 import org.webjcvi.fuzzy.FuzzyFind;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.contrast.BlockContrast;
+import org.webjcvi.mirror.MirrorJoint;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -92,6 +93,11 @@ public class WebJcviConfiguration {
     @Bean
     BlockContrast blockContrast() {
         return new BlockContrast();
+    }
+
+    @Bean
+    MirrorJoint mirrorJoint() {
+        return new MirrorJoint();
     }
 
     @Bean

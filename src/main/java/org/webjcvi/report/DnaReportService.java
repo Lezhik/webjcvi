@@ -26,6 +26,7 @@ import org.webjcvi.dna.SameBaseLagCensus;
 import org.webjcvi.dna.SkewIslandCensus;
 import org.webjcvi.dna.WrapCensus;
 import org.webjcvi.dna.WrapJointCensus;
+import org.webjcvi.dna.WrapReverseCensus;
 import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.storage.StorageNotFoundException;
 import org.slf4j.Logger;
@@ -113,10 +114,11 @@ public final class DnaReportService {
         HairpinCensus hairpins = HairpinCensus.from(sequence);
         MismatchCensus mismatches = MismatchCensus.from(sequence);
         NeighborCensus neighbors = NeighborCensus.from(sequence);
+        WrapReverseCensus wrapReverse = WrapReverseCensus.from(raw, neighbors);
         Map<String, String> sections = buildSections(
-                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors);
+                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse);
         String markdown = renderMarkdown(
-                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors);
+                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse);
         storage.writeText(reportRelativePath(), markdown);
         if (log.isDebugEnabled()) {
             log.debug("dna-report.regenerate.done bases={} markdownChars={} path={}",
@@ -175,7 +177,8 @@ public final class DnaReportService {
             FoldbackCensus foldback,
             HairpinCensus hairpins,
             MismatchCensus mismatches,
-            NeighborCensus neighbors) {
+            NeighborCensus neighbors,
+            WrapReverseCensus wrapReverse) {
         Map<String, String> sections = new LinkedHashMap<>();
         sections.put("meta", "generatedAt=" + ISO.format(generatedAt));
         sections.put("length", Integer.toString(sequence.length()));
@@ -184,9 +187,10 @@ public final class DnaReportService {
         sections.put("invalidTotal", Long.toString(sequence.invalidTotal()));
         sections.put("javaSourceCount", Integer.toString(javaSources.size()));
         sections.put("wrapModalWidth", Integer.toString(wraps.modalWidth()));
-        sections.put("identityModal", Integer.toString(neighbors.identity().modalDistance()));
-        sections.put("identityZeroEnrichment", String.format(Locale.ROOT, "%.3f", neighbors.identity().zeroEnrichment()));
-        sections.put("rcZeroEnrichment", String.format(Locale.ROOT, "%.3f", neighbors.rc().zeroEnrichment()));
+        sections.put("wrapJoints", Integer.toString(wrapReverse.wrapJoints()));
+        sections.put("wrapReverseShare", String.format(Locale.ROOT, "%.4f", wrapReverse.wrapReverseShare()));
+        sections.put("interiorReverseShare", String.format(Locale.ROOT, "%.4f", wrapReverse.interiorReverseShare()));
+        sections.put("wrapVsInterior", String.format(Locale.ROOT, "%.3f", wrapReverse.wrapVsInterior()));
         sections.put("longestHomopolymer", runs.longestBase() + "x" + runs.longestLength());
         return sections;
     }
@@ -208,16 +212,18 @@ public final class DnaReportService {
             FoldbackCensus foldback,
             HairpinCensus hairpins,
             MismatchCensus mismatches,
-            NeighborCensus neighbors) {
+            NeighborCensus neighbors,
+            WrapReverseCensus wrapReverse) {
         StringBuilder md = new StringBuilder();
         md.append("# WebJCVI DNA Report\n\n");
         md.append("Generated at **").append(ISO.format(generatedAt.atOffset(ZoneOffset.UTC))).append("**.\n\n");
         md.append("This report is rebuilt from `").append(dnaRelativePath)
-                .append("` and a snapshot of the current codebase. Version 12 of the builder ")
-                .append("measures adjacent 4-mer Hamming under three neighbor maps: identity, ")
-                .append("reverse, and reverse-complement. The v11 RC-only histogram was depleted ")
-                .append("at distance 0; this asks whether neighbors avoid any similarity or ")
-                .append("specifically avoid complementary pairing.\n\n");
+                .append("` and a snapshot of the current codebase. Version 13 of the builder ")
+                .append("compares reverse Hamming of adjacent 4-mers at FASTA wrap joints ")
+                .append("(last 4 of line N vs reverse of first 4 of line N+1) against the same ")
+                .append("measurement on the linear interior tape. v12 reverse distance-0 was ")
+                .append("enriched (×1.130); this asks whether that mirror lives on the wrap seam ")
+                .append("or along the tape.\n\n");
 
         md.append("## Sequence composition\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
@@ -258,30 +264,34 @@ public final class DnaReportService {
         md.append("First ").append(PREVIEW_BASES).append(" normalized bases:\n\n```\n");
         md.append(sequence.preview(PREVIEW_BASES)).append("\n```\n\n");
 
-        md.append("## Neighbor Hamming\n\n");
-        md.append("Overlapping adjacent 4-mers. Identity compares left to right as-is; ")
-                .append("reverse compares left to reverse(right); RC compares left to the ")
-                .append("reverse-complement of right. Distance-0 expected uses ")
-                .append("Σp² (identity/reverse) or 2pA pT + 2pG pC (RC).\n\n");
-        md.append("| Map | Modal Hamming | Mean | Zero share | Zero expected | Zero enrichment |\n");
-        md.append("| --- | --- | --- | --- | --- | --- |\n");
-        for (var row : neighbors.modes()) {
-            md.append("| ").append(row.mode()).append(" | ")
-                    .append(row.modalDistance()).append(" | ")
-                    .append(String.format(Locale.ROOT, "%.3f", row.meanDistance())).append(" | ")
-                    .append(String.format(Locale.ROOT, "%.4f", row.zeroShare())).append(" | ")
-                    .append(String.format(Locale.ROOT, "%.4f", row.zeroExpected())).append(" | ")
-                    .append(String.format(Locale.ROOT, "%.3f", row.zeroEnrichment())).append(" |\n");
-        }
-        md.append("\n| Metric | Value |\n| --- | --- |\n");
-        md.append("| Windows | ").append(neighbors.windows()).append(" |\n");
-        md.append("| Identity modal | ").append(neighbors.identity().modalDistance()).append(" |\n");
-        md.append("| Reverse modal | ").append(neighbors.reverse().modalDistance()).append(" |\n");
-        md.append("| RC modal | ").append(neighbors.rc().modalDistance()).append(" |\n\n");
-        md.append("`").append(neighbors.toTextRow()).append("`\n\n");
+        md.append("## Wrap reverse\n\n");
+        md.append("Wrap joints sample the last 4 canonical bases of line N against the reverse ")
+                .append("of the first 4 of line N+1. Interior windows are overlapping adjacent ")
+                .append("4-mers on the linear tape (the v12 reverse map). If wrap/interior ≫ 1, ")
+                .append("reverse enrichment is a wrap-seam protocol; if ≈ 1, it is linear.\n\n");
+        md.append("| Metric | Value |\n| --- | --- |\n");
+        md.append("| Wrap joints | ").append(wrapReverse.wrapJoints()).append(" |\n");
+        md.append("| Wrap reverse-0 | ").append(wrapReverse.wrapReverseZero()).append(" |\n");
+        md.append("| Wrap reverse-0 share | ")
+                .append(String.format(Locale.ROOT, "%.4f", wrapReverse.wrapReverseShare())).append(" |\n");
+        md.append("| Interior windows | ").append(wrapReverse.interiorWindows()).append(" |\n");
+        md.append("| Interior reverse-0 | ").append(wrapReverse.interiorReverseZero()).append(" |\n");
+        md.append("| Interior reverse-0 share | ")
+                .append(String.format(Locale.ROOT, "%.4f", wrapReverse.interiorReverseShare())).append(" |\n");
+        md.append("| Wrap / interior | ")
+                .append(String.format(Locale.ROOT, "%.3f", wrapReverse.wrapVsInterior())).append(" |\n\n");
+        md.append("`").append(wrapReverse.toTextRow()).append("`\n\n");
 
         md.append("## Frame remainder\n\n");
-        md.append("Pairing mismatches (RC-only): modal **").append(mismatches.modalDistance())
+        md.append("Neighbor Hamming (linear tape): identity modal **")
+                .append(neighbors.identity().modalDistance())
+                .append("** zero× **")
+                .append(String.format(Locale.ROOT, "%.3f", neighbors.identity().zeroEnrichment()))
+                .append("**; reverse × **")
+                .append(String.format(Locale.ROOT, "%.3f", neighbors.reverse().zeroEnrichment()))
+                .append("**; RC × **")
+                .append(String.format(Locale.ROOT, "%.3f", neighbors.rc().zeroEnrichment()))
+                .append("**. Pairing mismatches (RC-only): modal **").append(mismatches.modalDistance())
                 .append("**, distance-0 × **")
                 .append(String.format(Locale.ROOT, "%.3f", mismatches.zeroEnrichment()))
                 .append("**. Hairpins: modal loop **").append(hairpins.modalLoop())
@@ -303,7 +313,7 @@ public final class DnaReportService {
                 .append("**.\n\n");
 
         md.append("## Extracted tape rules\n\n");
-        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors);
+        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse);
 
         md.append("## Codebase snapshot\n\n");
         md.append(javaSources.size()).append(" Java source files under `src/main/java`:\n\n");
@@ -318,19 +328,20 @@ public final class DnaReportService {
 
         md.append("## Growth notes for the next iteration\n\n");
         md.append("- Dominant canonical base: **").append(dominantBase(sequence)).append("**.\n");
-        md.append("- Neighbor Hamming: identity modal **").append(neighbors.identity().modalDistance())
-                .append("**, distance-0 × **")
+        md.append("- Wrap reverse: wrap reverse-0 share **")
+                .append(String.format(Locale.ROOT, "%.4f", wrapReverse.wrapReverseShare()))
+                .append("** vs interior **")
+                .append(String.format(Locale.ROOT, "%.4f", wrapReverse.interiorReverseShare()))
+                .append("** (wrap/interior **")
+                .append(String.format(Locale.ROOT, "%.3f", wrapReverse.wrapVsInterior()))
+                .append("**). If wrap/interior ≫ 1, reverse enrichment is a wrap-seam protocol; ")
+                .append("if ≈ 1, the mirror lives on the linear tape and wrap is just a sample of it.\n");
+        md.append("- Neighbor remainder: identity zero× **")
                 .append(String.format(Locale.ROOT, "%.3f", neighbors.identity().zeroEnrichment()))
                 .append("**; reverse × **")
                 .append(String.format(Locale.ROOT, "%.3f", neighbors.reverse().zeroEnrichment()))
                 .append("**; RC × **")
                 .append(String.format(Locale.ROOT, "%.3f", neighbors.rc().zeroEnrichment()))
-                .append("**. If identity distance 0 is also depleted, adjacent blocks avoid ")
-                .append("any match and stutter-scan is the protocol; if only RC is depleted, ")
-                .append("the product should compare reverses/complements, not identity Hamming.\n");
-        md.append("- Pairing-mismatch remainder: modal **").append(mismatches.modalDistance())
-                .append("**, distance-0 × **")
-                .append(String.format(Locale.ROOT, "%.3f", mismatches.zeroEnrichment()))
                 .append("**.\n");
         md.append("- Homopolymer longest **").append(runs.longestBase()).append(" × ")
                 .append(runs.longestLength()).append("**.\n");
@@ -358,23 +369,24 @@ public final class DnaReportService {
             FoldbackCensus foldback,
             HairpinCensus hairpins,
             MismatchCensus mismatches,
-            NeighborCensus neighbors) {
+            NeighborCensus neighbors,
+            WrapReverseCensus wrapReverse) {
         long a = sequence.canonicalCounts().getOrDefault('A', 0L);
         long t = sequence.canonicalCounts().getOrDefault('T', 0L);
-        md.append("1. **R1 Neighbor maps.** Identity modal ")
-                .append(neighbors.identity().modalDistance())
-                .append(" zero×")
+        md.append("1. **R1 Wrap vs interior reverse.** Wrap reverse-0 share ")
+                .append(String.format(Locale.ROOT, "%.4f", wrapReverse.wrapReverseShare()))
+                .append(" vs interior ")
+                .append(String.format(Locale.ROOT, "%.4f", wrapReverse.interiorReverseShare()))
+                .append(" (wrap/interior ")
+                .append(String.format(Locale.ROOT, "%.3f", wrapReverse.wrapVsInterior()))
+                .append(").\n");
+        md.append("2. **R2 Neighbor remainder.** Identity zero×")
                 .append(String.format(Locale.ROOT, "%.3f", neighbors.identity().zeroEnrichment()))
-                .append("; reverse modal ")
-                .append(neighbors.reverse().modalDistance())
-                .append(" zero×")
+                .append("; reverse ×")
                 .append(String.format(Locale.ROOT, "%.3f", neighbors.reverse().zeroEnrichment()))
-                .append("; RC modal ")
-                .append(neighbors.rc().modalDistance())
-                .append(" zero×")
+                .append("; RC ×")
                 .append(String.format(Locale.ROOT, "%.3f", neighbors.rc().zeroEnrichment()))
-                .append(".\n");
-        md.append("2. **R2 Pairing-mismatch remainder.** Modal Hamming ")
+                .append(". Pairing-mismatch modal ")
                 .append(mismatches.modalDistance())
                 .append("; distance-0 ×")
                 .append(String.format(Locale.ROOT, "%.3f", mismatches.zeroEnrichment()))

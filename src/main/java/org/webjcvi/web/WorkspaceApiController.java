@@ -18,6 +18,7 @@ import org.webjcvi.fold.PalindromeScan;
 import org.webjcvi.loop.StemLoop;
 import org.webjcvi.fuzzy.FuzzyFind;
 import org.webjcvi.contrast.BlockContrast;
+import org.webjcvi.mirror.MirrorJoint;
 import org.webjcvi.logs.LogAnalysisReport;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.report.DnaReport;
@@ -50,6 +51,7 @@ public class WorkspaceApiController {
     private final StemLoop loops;
     private final FuzzyFind fuzzy;
     private final BlockContrast contrast;
+    private final MirrorJoint mirrors;
     private final LogAnalysisService logAnalysis;
 
     public WorkspaceApiController(
@@ -66,6 +68,7 @@ public class WorkspaceApiController {
             StemLoop loops,
             FuzzyFind fuzzy,
             BlockContrast contrast,
+            MirrorJoint mirrors,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -80,6 +83,7 @@ public class WorkspaceApiController {
         this.loops = loops;
         this.fuzzy = fuzzy;
         this.contrast = contrast;
+        this.mirrors = mirrors;
         this.logAnalysis = logAnalysis;
     }
 
@@ -424,6 +428,32 @@ public class WorkspaceApiController {
                                 row.put("index", hit.index());
                                 row.put("offset", hit.offset());
                                 row.put("distance", hit.distance());
+                                row.put("left", hit.left());
+                                row.put("right", hit.right());
+                                return row;
+                            })
+                            .toList());
+                            return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/mirror")
+    public Mono<Map<String, Object>> findMirrors(
+            @RequestParam("text") String text,
+            @RequestParam(name = "width", defaultValue = "4") int width) {
+        return Mono.fromCallable(() -> {
+                    var scan = mirrors.scan(text, width);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("width", scan.width());
+                    body.put("scanned", scan.scanned());
+                    body.put("jointCount", scan.jointCount());
+                    body.put("hits", scan.hits().stream()
+                            .map(hit -> {
+                                Map<String, Object> row = new LinkedHashMap<>();
+                                row.put("index", hit.index());
+                                row.put("offset", hit.offset());
+                                row.put("identityDistance", hit.identityDistance());
                                 row.put("left", hit.left());
                                 row.put("right", hit.right());
                                 return row;

@@ -20,6 +20,7 @@ import org.webjcvi.fold.FoldException;
 import org.webjcvi.loop.LoopException;
 import org.webjcvi.fuzzy.FuzzyException;
 import org.webjcvi.contrast.ContrastException;
+import org.webjcvi.mirror.MirrorException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
@@ -88,6 +89,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> contrast(ContrastException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "contrast", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(MirrorException.class)
+    ResponseEntity<Map<String, String>> mirror(MirrorException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "mirror", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

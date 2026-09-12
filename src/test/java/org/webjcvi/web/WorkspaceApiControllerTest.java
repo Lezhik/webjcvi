@@ -126,6 +126,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/loop");
                     assertThat(html).contains("/fuzzy");
                     assertThat(html).contains("/contrast");
+                    assertThat(html).contains("/mirror");
                 });
     }
 
@@ -572,6 +573,46 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void mirrorApiFlagsReverseNeighbors() {
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/mirror")
+                        .queryParam("text", "abcddcba")
+                        .queryParam("width", "4")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.jointCount").isEqualTo(1)
+                .jsonPath("$.hits[0].left").isEqualTo("ABCD")
+                .jsonPath("$.hits[0].right").isEqualTo("DCBA");
+    }
+
+    @Test
+    void mirrorPageRenders() {
+        webTestClient.get()
+                .uri("/mirror")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Mirror joints"));
+    }
+
+    @Test
+    void mirrorPageFormFlagsReverseNeighbors() {
+        webTestClient.post()
+                .uri("/mirror")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=abcddcba&width=4")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("ABCD");
+                    assertThat(html).contains("DCBA");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -592,6 +633,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.palindromes.hitCount").isNumber()
                 .jsonPath("$.spans.spanCount").isNumber()
                 .jsonPath("$.fuzzy.skipped").isBoolean()
-                .jsonPath("$.contrast.stutterCount").isNumber();
+                .jsonPath("$.contrast.stutterCount").isNumber()
+                .jsonPath("$.mirrors.jointCount").isNumber();
     }
 }

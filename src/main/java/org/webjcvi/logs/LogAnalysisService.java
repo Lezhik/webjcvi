@@ -16,6 +16,7 @@ import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.tape.ScratchTape;
 import org.webjcvi.token.RareBreakTokenizer;
 import org.webjcvi.contrast.BlockContrast;
+import org.webjcvi.mirror.MirrorJoint;
 
 /**
  * Fixed-API facade over the text-processing algorithms for log analysis.
@@ -43,11 +44,12 @@ public final class LogAnalysisService {
     private final StemLoop loops;
     private final FuzzyFind fuzzy;
     private final BlockContrast contrast;
+    private final MirrorJoint mirrors;
 
     public LogAnalysisService() {
         this(new BannerSplitter(), new PairDrift(), new WrapReflow(), new RareClassScanner(),
                 new RareBreakTokenizer(), new KmerStamp(), new PalindromeScan(), new StemLoop(),
-                new FuzzyFind(), new BlockContrast());
+                new FuzzyFind(), new BlockContrast(), new MirrorJoint());
     }
 
     public LogAnalysisService(
@@ -60,7 +62,8 @@ public final class LogAnalysisService {
             PalindromeScan palindromes,
             StemLoop loops,
             FuzzyFind fuzzy,
-            BlockContrast contrast) {
+            BlockContrast contrast,
+            MirrorJoint mirrors) {
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
@@ -71,6 +74,7 @@ public final class LogAnalysisService {
         this.loops = loops;
         this.fuzzy = fuzzy;
         this.contrast = contrast;
+        this.mirrors = mirrors;
     }
 
     /**
@@ -167,6 +171,12 @@ public final class LogAnalysisService {
                 contrastScan.meanDistance(),
                 contrastScan.flagMax());
 
+        var mirrorScan = mirrors.scan(payload);
+        var mirrorSection = new LogAnalysisReport.MirrorSection(
+                mirrorScan.scanned(),
+                mirrorScan.jointCount(),
+                mirrorScan.width());
+
         LogAnalysisReport report = new LogAnalysisReport(
                 API_VERSION,
                 inputLength,
@@ -181,9 +191,10 @@ public final class LogAnalysisService {
                 palindromeSection,
                 spanSection,
                 fuzzySection,
-                contrastSection);
+                contrastSection,
+                mirrorSection);
         if (log.isDebugEnabled()) {
-            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={}",
+            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={}",
                     truncated,
                     tapeSection.runCount(),
                     bannerSection.sectionCount(),
@@ -193,7 +204,8 @@ public final class LogAnalysisService {
                     palindromeSection.hitCount(),
                     spanSection.spanCount(),
                     fuzzySection.hitCount(),
-                    contrastSection.stutterCount());
+                    contrastSection.stutterCount(),
+                    mirrorSection.jointCount());
         }
         return report;
     }

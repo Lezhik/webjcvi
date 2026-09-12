@@ -31,6 +31,8 @@ import org.webjcvi.fuzzy.FuzzyException;
 import org.webjcvi.fuzzy.FuzzyFind;
 import org.webjcvi.contrast.BlockContrast;
 import org.webjcvi.contrast.ContrastException;
+import org.webjcvi.mirror.MirrorException;
+import org.webjcvi.mirror.MirrorJoint;
 import org.webjcvi.logs.LogAnalysisService;
 
 /**
@@ -54,13 +56,14 @@ public class WebJcviMcpTools {
     private final StemLoop loops;
     private final FuzzyFind fuzzy;
     private final BlockContrast contrast;
+    private final MirrorJoint mirrors;
     private final LogAnalysisService logAnalysis;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
         this(storage, reports, new ScratchTape(), new BannerSplitter(), new PairDrift(),
                 new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer(), new KmerStamp(),
                 new PalindromeScan(), new StemLoop(), new FuzzyFind(), new BlockContrast(),
-                new LogAnalysisService());
+                new MirrorJoint(), new LogAnalysisService());
     }
 
     @Autowired
@@ -78,6 +81,7 @@ public class WebJcviMcpTools {
             StemLoop loops,
             FuzzyFind fuzzy,
             BlockContrast contrast,
+            MirrorJoint mirrors,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -92,6 +96,7 @@ public class WebJcviMcpTools {
         this.loops = loops;
         this.fuzzy = fuzzy;
         this.contrast = contrast;
+        this.mirrors = mirrors;
         this.logAnalysis = logAnalysis;
     }
 
@@ -396,6 +401,29 @@ public class WebJcviMcpTools {
         });
     }
 
+    @Tool(name = "find_mirrors", description = "Find adjacent reverse joints in caller-supplied text: the next block is the reverse of the current one, but not a copy. Default width 4. Not the DNA file and not a project path.")
+    public String findMirrors(
+            @ToolParam(description = "Arbitrary text to scan") String text,
+            @ToolParam(description = "Window width; use 4 unless you need a different floor") int width) {
+        return run(() -> {
+            int w = width < 2 ? MirrorJoint.DEFAULT_WIDTH : width;
+            var scan = mirrors.scan(text, w);
+            StringBuilder out = new StringBuilder(scan.summary()).append('\n');
+            if (scan.hits().isEmpty()) {
+                out.append("(no mirrors)");
+                return out.toString();
+            }
+            for (var hit : scan.hits()) {
+                out.append("#").append(hit.index())
+                        .append(" offset ").append(hit.offset())
+                        .append(" identity ").append(hit.identityDistance())
+                        .append('\n')
+                        .append(hit.left()).append(" | ").append(hit.right()).append('\n');
+            }
+            return out.toString();
+        });
+    }
+
     @Tool(name = "analyze_logs", description = "Analyze caller-supplied log text with the shared log-analysis facade. Returns a JSON report. Not the DNA file. Truncates at 524288 characters.")
     public String analyzeLogs(
             @ToolParam(description = "Log text to analyze") String text) {
@@ -427,7 +455,7 @@ public class WebJcviMcpTools {
             return action.execute();
         } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException
                  | RareException | TokenException | StampException | FoldException | LoopException
-                 | FuzzyException | ContrastException e) {
+                 | FuzzyException | ContrastException | MirrorException e) {
             return "Error: " + e.getMessage();
         }
     }
