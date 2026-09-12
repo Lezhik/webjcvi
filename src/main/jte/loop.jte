@@ -28,7 +28,7 @@
     </style>
 </head>
 <body>
-    <nav><a href="/">← Home</a> · <a href="/tape">Scratch tape</a> · <a href="/split">Banner split</a> · <a href="/drift">Pair drift</a> · <a href="/reflow">Unwrap</a> · <a href="/rare">Rare islands</a> · <a href="/tokens">Tokens</a> · <a href="/stamps">Stamps</a> · <a href="/fold">Fold</a></nav>
+    <nav><a href="/">← Home</a> · <a href="/tape">Scratch tape</a> · <a href="/split">Banner split</a> · <a href="/drift">Pair drift</a> · <a href="/reflow">Unwrap</a> · <a href="/rare">Rare islands</a> · <a href="/tokens">Tokens</a> · <a href="/stamps">Stamps</a> · <a href="/fold">Fold</a> · <a href="/fuzzy">Fuzzy</a></nav>
     <h1>Stem loops</h1>
     <p>Extracts complementary delimiter spans <code>()[]{}&lt;&gt;</code> and the
         loop they enclose. Reverse-complement foldback beat letter palindromes

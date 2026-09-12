@@ -27,6 +27,8 @@ import org.webjcvi.fold.FoldException;
 import org.webjcvi.fold.PalindromeScan;
 import org.webjcvi.loop.LoopException;
 import org.webjcvi.loop.StemLoop;
+import org.webjcvi.fuzzy.FuzzyException;
+import org.webjcvi.fuzzy.FuzzyFind;
 
 /**
  * MCP tool surface. File tools go through {@link FileStorageService}. The
@@ -47,11 +49,12 @@ public class WebJcviMcpTools {
     private final KmerStamp stamp;
     private final PalindromeScan palindromes;
     private final StemLoop loops;
+    private final FuzzyFind fuzzy;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
         this(storage, reports, new ScratchTape(), new BannerSplitter(), new PairDrift(),
                 new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer(), new KmerStamp(),
-                new PalindromeScan(), new StemLoop());
+                new PalindromeScan(), new StemLoop(), new FuzzyFind());
     }
 
     @Autowired
@@ -66,7 +69,8 @@ public class WebJcviMcpTools {
             RareBreakTokenizer tokenizer,
             KmerStamp stamp,
             PalindromeScan palindromes,
-            StemLoop loops) {
+            StemLoop loops,
+            FuzzyFind fuzzy) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
@@ -78,6 +82,7 @@ public class WebJcviMcpTools {
         this.stamp = stamp;
         this.palindromes = palindromes;
         this.loops = loops;
+        this.fuzzy = fuzzy;
     }
 
     @Tool(name = "regenerate_dna_report", description = "Clear prior reports and rebuild the DNA report from jcvi-dna.txt and the current codebase.")
@@ -332,6 +337,30 @@ public class WebJcviMcpTools {
         });
     }
 
+    @Tool(name = "fuzzy_find", description = "Find near-matches of a motif in caller-supplied text using Hamming distance (default max 1). Min motif length 4. Not the DNA file and not a project path.")
+    public String fuzzyFind(
+            @ToolParam(description = "Arbitrary text to scan") String text,
+            @ToolParam(description = "Motif to search; at least 4 characters") String motif,
+            @ToolParam(description = "Maximum Hamming distance; use 1 unless you need a different floor") int maxDist) {
+        return run(() -> {
+            int cap = maxDist < 0 ? FuzzyFind.DEFAULT_MAX_DIST : maxDist;
+            var scan = fuzzy.search(text, motif, cap);
+            StringBuilder out = new StringBuilder(scan.summary()).append('\n');
+            if (scan.hits().isEmpty()) {
+                out.append("(no hits)");
+                return out.toString();
+            }
+            for (var hit : scan.hits()) {
+                out.append("#").append(hit.index())
+                        .append(" offset ").append(hit.offset())
+                        .append(" distance ").append(hit.distance())
+                        .append('\n')
+                        .append(hit.preview()).append('\n');
+            }
+            return out.toString();
+        });
+    }
+
     @Tool(name = "list_files", description = "List files inside the project directory. Paths must be relative to the project root.")
     public String listFiles(
             @ToolParam(description = "Relative directory to list, or '.' for the project root") String path,
@@ -356,7 +385,8 @@ public class WebJcviMcpTools {
         try {
             return action.execute();
         } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException
-                 | RareException | TokenException | StampException | FoldException | LoopException e) {
+                 | RareException | TokenException | StampException | FoldException | LoopException
+                 | FuzzyException e) {
             return "Error: " + e.getMessage();
         }
     }

@@ -27,7 +27,7 @@
     </style>
 </head>
 <body>
-    <nav><a href="/">← Home</a> · <a href="/tape">Scratch tape</a> · <a href="/split">Banner split</a> · <a href="/drift">Pair drift</a> · <a href="/reflow">Unwrap</a> · <a href="/rare">Rare islands</a> · <a href="/tokens">Tokens</a> · <a href="/stamps">Stamps</a> · <a href="/loop">Loops</a></nav>
+    <nav><a href="/">← Home</a> · <a href="/tape">Scratch tape</a> · <a href="/split">Banner split</a> · <a href="/drift">Pair drift</a> · <a href="/reflow">Unwrap</a> · <a href="/rare">Rare islands</a> · <a href="/tokens">Tokens</a> · <a href="/stamps">Stamps</a> · <a href="/loop">Loops</a> · <a href="/fuzzy">Fuzzy</a></nav>
     <h1>Fold palindromes</h1>
     <p>Finds even palindromes of length ≥ <strong>4</strong> that are not
         homopolymers. Forward same-base identity is nearly chance (lag 1 ×

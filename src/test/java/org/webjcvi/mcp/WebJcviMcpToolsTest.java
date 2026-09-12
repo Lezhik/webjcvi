@@ -47,6 +47,7 @@ class WebJcviMcpToolsTest {
                         "kmer_stamps",
                         "find_palindromes",
                         "extract_spans",
+                        "fuzzy_find",
                         "list_files",
                         "read_file");
     }
@@ -95,7 +96,7 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Hairpin loops");
+        assertThat(markdown).contains("Pairing mismatches");
         assertThat(markdown).contains("Frame remainder");
     }
 
@@ -183,5 +184,14 @@ class WebJcviMcpToolsTest {
         assertThat(result).doesNotContain("hidden");
         assertThat(result).doesNotContain("nope");
         assertThat(tools.readFile("secret.txt")).isEqualTo("(hidden)");
+    }
+
+    @Test
+    void fuzzyFindDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "hello-hidden");
+        String result = tools.fuzzyFind("hello hallo hello", "hello", 1);
+        assertThat(result).contains("hallo");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("hello-hidden");
     }
 }

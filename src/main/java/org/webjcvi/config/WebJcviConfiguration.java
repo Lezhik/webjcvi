@@ -16,6 +16,7 @@ import org.webjcvi.token.RareBreakTokenizer;
 import org.webjcvi.stamp.KmerStamp;
 import org.webjcvi.fold.PalindromeScan;
 import org.webjcvi.loop.StemLoop;
+import org.webjcvi.fuzzy.FuzzyFind;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -79,6 +80,11 @@ public class WebJcviConfiguration {
     @Bean
     StemLoop stemLoop() {
         return new StemLoop();
+    }
+
+    @Bean
+    FuzzyFind fuzzyFind() {
+        return new FuzzyFind();
     }
 
     @Bean

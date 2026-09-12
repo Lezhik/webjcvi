@@ -16,6 +16,7 @@ import org.webjcvi.token.RareBreakTokenizer;
 import org.webjcvi.stamp.KmerStamp;
 import org.webjcvi.fold.PalindromeScan;
 import org.webjcvi.loop.StemLoop;
+import org.webjcvi.fuzzy.FuzzyFind;
 import org.webjcvi.report.DnaReport;
 import org.webjcvi.report.DnaReportService;
 import org.webjcvi.segment.BannerSplitter;
@@ -44,6 +45,7 @@ public class WorkspaceApiController {
     private final KmerStamp stamp;
     private final PalindromeScan palindromes;
     private final StemLoop loops;
+    private final FuzzyFind fuzzy;
 
     public WorkspaceApiController(
             FileStorageService storage,
@@ -56,7 +58,8 @@ public class WorkspaceApiController {
             RareBreakTokenizer tokenizer,
             KmerStamp stamp,
             PalindromeScan palindromes,
-            StemLoop loops) {
+            StemLoop loops,
+            FuzzyFind fuzzy) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
@@ -68,6 +71,7 @@ public class WorkspaceApiController {
         this.stamp = stamp;
         this.palindromes = palindromes;
         this.loops = loops;
+        this.fuzzy = fuzzy;
     }
 
     @GetMapping("/files")
@@ -356,6 +360,33 @@ public class WorkspaceApiController {
                                 row.put("opener", span.opener());
                                 row.put("closer", span.closer());
                                 row.put("preview", span.preview());
+                                return row;
+                            })
+                            .toList());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/fuzzy")
+    public Mono<Map<String, Object>> fuzzyFind(
+            @RequestParam("text") String text,
+            @RequestParam("motif") String motif,
+            @RequestParam(name = "dist", defaultValue = "1") int maxDist) {
+        return Mono.fromCallable(() -> {
+                    var scan = fuzzy.search(text, motif, maxDist);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("scanned", scan.scanned());
+                    body.put("hitCount", scan.hitCount());
+                    body.put("motifLength", scan.motifLength());
+                    body.put("maxDist", scan.maxDist());
+                    body.put("hits", scan.hits().stream()
+                            .map(hit -> {
+                                Map<String, Object> row = new LinkedHashMap<>();
+                                row.put("index", hit.index());
+                                row.put("offset", hit.offset());
+                                row.put("distance", hit.distance());
+                                row.put("preview", hit.preview());
                                 return row;
                             })
                             .toList());

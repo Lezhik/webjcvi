@@ -43,11 +43,11 @@ class DnaReportServiceTest {
         assertThat(report.sequence().normalized()).isEqualTo("ATGCATGN");
         assertThat(report.markdown()).contains("WebJCVI DNA Report");
         assertThat(report.markdown()).contains("src/main/java/org/webjcvi/Example.java");
-        assertThat(report.markdown()).contains("Hairpin loops");
+        assertThat(report.markdown()).contains("Pairing mismatches");
         assertThat(report.markdown()).contains("Frame remainder");
         assertThat(report.sections()).containsKeys(
                 "length", "gcPercent", "javaSourceCount",
-                "wrapModalWidth", "modalLoop", "gappedHairpins");
+                "wrapModalWidth", "modalDistance", "zeroEnrichment");
         assertThat(report.sequence().ambiguousTotal()).isEqualTo(1);
     }
 

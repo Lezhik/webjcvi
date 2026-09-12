@@ -18,6 +18,7 @@ import org.webjcvi.token.TokenException;
 import org.webjcvi.stamp.StampException;
 import org.webjcvi.fold.FoldException;
 import org.webjcvi.loop.LoopException;
+import org.webjcvi.fuzzy.FuzzyException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
@@ -74,6 +75,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> loop(LoopException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "loop", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(FuzzyException.class)
+    ResponseEntity<Map<String, String>> fuzzy(FuzzyException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "fuzzy", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

@@ -124,6 +124,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/stamps");
                     assertThat(html).contains("/fold");
                     assertThat(html).contains("/loop");
+                    assertThat(html).contains("/fuzzy");
                 });
     }
 
@@ -484,6 +485,47 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("hello");
                     assertThat(html).doesNotContain("nope");
                     assertThat(html).contains("span");
+                });
+    }
+
+    @Test
+    void fuzzyApiFindsHalloAtDistanceOne() {
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/fuzzy")
+                        .queryParam("text", "hello hallo hello")
+                        .queryParam("motif", "hello")
+                        .queryParam("dist", "1")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.hitCount").isEqualTo(3)
+                .jsonPath("$.hits[0].distance").isEqualTo(0)
+                .jsonPath("$.hits[2].preview").isEqualTo("hallo");
+    }
+
+    @Test
+    void fuzzyPageRenders() {
+        webTestClient.get()
+                .uri("/fuzzy")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Fuzzy find"));
+    }
+
+    @Test
+    void fuzzyPageFormFindsHallo() {
+        webTestClient.post()
+                .uri("/fuzzy")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=hello+hallo+hello&motif=hello&dist=1")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("hallo");
+                    assertThat(html).contains("distance");
                 });
     }
 }

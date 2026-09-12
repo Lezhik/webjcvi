@@ -20,6 +20,7 @@ import org.webjcvi.dna.FrameSkewCensus;
 import org.webjcvi.dna.GcIslandCensus;
 import org.webjcvi.dna.HairpinCensus;
 import org.webjcvi.dna.HomopolymerProfile;
+import org.webjcvi.dna.MismatchCensus;
 import org.webjcvi.dna.SameBaseLagCensus;
 import org.webjcvi.dna.SkewIslandCensus;
 import org.webjcvi.dna.WrapCensus;
@@ -103,10 +104,11 @@ public final class DnaReportService {
         SameBaseLagCensus lags = SameBaseLagCensus.from(sequence);
         FoldbackCensus foldback = FoldbackCensus.from(sequence);
         HairpinCensus hairpins = HairpinCensus.from(sequence);
+        MismatchCensus mismatches = MismatchCensus.from(sequence);
         Map<String, String> sections = buildSections(
-                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins);
+                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches);
         String markdown = renderMarkdown(
-                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins);
+                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches);
         storage.writeText(reportRelativePath(), markdown);
         return new DnaReport(generatedAt, sequence, sections, markdown);
     }
@@ -159,7 +161,8 @@ public final class DnaReportService {
             CodonFrameCensus codons,
             SameBaseLagCensus lags,
             FoldbackCensus foldback,
-            HairpinCensus hairpins) {
+            HairpinCensus hairpins,
+            MismatchCensus mismatches) {
         Map<String, String> sections = new LinkedHashMap<>();
         sections.put("meta", "generatedAt=" + ISO.format(generatedAt));
         sections.put("length", Integer.toString(sequence.length()));
@@ -168,10 +171,9 @@ public final class DnaReportService {
         sections.put("invalidTotal", Long.toString(sequence.invalidTotal()));
         sections.put("javaSourceCount", Integer.toString(javaSources.size()));
         sections.put("wrapModalWidth", Integer.toString(wraps.modalWidth()));
-        sections.put("modalLoop", Integer.toString(hairpins.modalLoop()));
-        sections.put("modalHairpins", Integer.toString(hairpins.modalHairpins()));
-        sections.put("adjacentHairpins", Integer.toString(hairpins.adjacent()));
-        sections.put("gappedHairpins", Integer.toString(hairpins.gapped()));
+        sections.put("modalDistance", Integer.toString(mismatches.modalDistance()));
+        sections.put("zeroShare", String.format(Locale.ROOT, "%.4f", mismatches.zeroShare()));
+        sections.put("zeroEnrichment", String.format(Locale.ROOT, "%.3f", mismatches.zeroEnrichment()));
         sections.put("longestHomopolymer", runs.longestBase() + "x" + runs.longestLength());
         return sections;
     }
@@ -191,15 +193,16 @@ public final class DnaReportService {
             CodonFrameCensus codons,
             SameBaseLagCensus lags,
             FoldbackCensus foldback,
-            HairpinCensus hairpins) {
+            HairpinCensus hairpins,
+            MismatchCensus mismatches) {
         StringBuilder md = new StringBuilder();
         md.append("# WebJCVI DNA Report\n\n");
         md.append("Generated at **").append(ISO.format(generatedAt.atOffset(ZoneOffset.UTC))).append("**.\n\n");
         md.append("This report is rebuilt from `").append(dnaRelativePath)
-                .append("` and a snapshot of the current codebase. Version 10 of the builder ")
-                .append("counts reverse-complement hairpins by loop width (the unpaired gap ")
-                .append("between stem halves). Adjacent foldback mixed stem with center; this ")
-                .append("asks whether enclosure (loop ≥ 1) actually outruns a solid palindrome.\n\n");
+                .append("` and a snapshot of the current codebase. Version 11 of the builder ")
+                .append("measures Hamming distance of each 4-mer to the reverse-complement of ")
+                .append("the adjacent 4-mer. Hairpin counts were flat across loop widths; this ")
+                .append("asks whether exact pairing (distance 0) is enriched versus chance.\n\n");
 
         md.append("## Sequence composition\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
@@ -240,42 +243,43 @@ public final class DnaReportService {
         md.append("First ").append(PREVIEW_BASES).append(" normalized bases:\n\n```\n");
         md.append(sequence.preview(PREVIEW_BASES)).append("\n```\n\n");
 
-        md.append("## Hairpin loops\n\n");
-        md.append("Reverse-complement stems of paired length ≥ 4, split by the unpaired ")
-                .append("loop between the two halves. Loop 0 is an even adjacent palindrome; ")
-                .append("loop 1 is the odd-center case; larger loops are true hairpin gaps.\n\n");
-        md.append("| Loop | Hairpins | Longest stem | AT pairs | GC pairs |\n| --- | --- | --- | --- | --- |\n");
-        for (var row : hairpins.rows()) {
-            md.append("| ").append(row.loop()).append(" | ")
-                    .append(row.hairpins()).append(" | ")
-                    .append(row.longestStem()).append(" | ")
-                    .append(row.atPairs()).append(" | ")
-                    .append(row.gcPairs()).append(" |\n");
+        md.append("## Pairing mismatches\n\n");
+        md.append("Overlapping 8-base windows: left 4-mer versus reverse-complement of the ")
+                .append("right 4-mer. Distance 0 is an exact even stem of length 8. Expected ")
+                .append("counts use binomial complementary-pair chance (2pA pT + 2pG pC).\n\n");
+        md.append("| Hamming | Count | Share % | Expected | Enrichment |\n| --- | --- | --- | --- | --- |\n");
+        for (var row : mismatches.rows()) {
+            md.append("| ").append(row.distance()).append(" | ")
+                    .append(row.count()).append(" | ")
+                    .append(String.format(Locale.ROOT, "%.2f", row.sharePercent())).append(" | ")
+                    .append(String.format(Locale.ROOT, "%.1f", row.expected())).append(" | ")
+                    .append(String.format(Locale.ROOT, "%.3f", row.enrichment())).append(" |\n");
         }
         md.append("\n| Metric | Value |\n| --- | --- |\n");
-        md.append("| Modal loop | ").append(hairpins.modalLoop()).append(" |\n");
-        md.append("| Hairpins at modal loop | ").append(hairpins.modalHairpins()).append(" |\n");
-        md.append("| Adjacent (loop 0) | ").append(hairpins.adjacent()).append(" |\n");
-        md.append("| Gapped (loop ≥ 1) | ").append(hairpins.gapped()).append(" |\n");
-        md.append("| Longest adjacent stem | ").append(hairpins.longestAdjacent()).append(" |\n");
-        md.append("| Longest gapped stem | ").append(hairpins.longestGapped()).append(" |\n\n");
-        md.append("`").append(hairpins.toTextRow()).append("`\n\n");
+        md.append("| Windows | ").append(mismatches.windows()).append(" |\n");
+        md.append("| Complementary pair chance | ")
+                .append(String.format(Locale.ROOT, "%.4f", mismatches.pairChance())).append(" |\n");
+        md.append("| Modal Hamming distance | ").append(mismatches.modalDistance()).append(" |\n");
+        md.append("| Distance-0 share | ")
+                .append(String.format(Locale.ROOT, "%.4f", mismatches.zeroShare())).append(" |\n");
+        md.append("| Distance-0 expected | ")
+                .append(String.format(Locale.ROOT, "%.4f", mismatches.zeroExpected())).append(" |\n");
+        md.append("| Distance-0 enrichment | ")
+                .append(String.format(Locale.ROOT, "%.3f", mismatches.zeroEnrichment())).append(" |\n\n");
+        md.append("`").append(mismatches.toTextRow()).append("`\n\n");
 
         md.append("## Frame remainder\n\n");
-        md.append("Foldback RC stems **").append(foldback.rcStems())
+        md.append("Hairpins: modal loop **").append(hairpins.modalLoop())
+                .append("** (").append(hairpins.modalHairpins())
+                .append("); adjacent **").append(hairpins.adjacent())
+                .append("**, gapped **").append(hairpins.gapped())
+                .append("**. Foldback RC **").append(foldback.rcStems())
                 .append("**, longest **").append(foldback.longestRc())
-                .append("**, even/odd **").append(foldback.rcEven()).append("/")
-                .append(foldback.rcOdd())
-                .append("**. Same-base even palindromes **").append(foldback.sameEven())
-                .append("**, longest **").append(foldback.longestSame())
-                .append("**. Same-base lags: peak lag **").append(lags.peakLag())
-                .append("** enrichment **")
+                .append("**. Same-base lags: peak **").append(lags.peakLag())
+                .append("** × ")
                 .append(String.format(Locale.ROOT, "%.3f", lags.peakEnrichment()))
-                .append("** vs independence **")
-                .append(String.format(Locale.ROOT, "%.4f", lags.independent()))
-                .append("**. Codon GC spread **")
+                .append(". Codon GC spread **")
                 .append(String.format(Locale.ROOT, "%.2f", codons.maxGcSpread()))
-                .append("**. GC islands longest **").append(gcIslands.longestGc())
                 .append("**. Wrap modal **").append(wraps.modalWidth())
                 .append("**. Homopolymer longest **")
                 .append(runs.longestBase()).append(" × ").append(runs.longestLength())
@@ -284,7 +288,7 @@ public final class DnaReportService {
                 .append("**.\n\n");
 
         md.append("## Extracted tape rules\n\n");
-        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins);
+        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches);
 
         md.append("## Codebase snapshot\n\n");
         md.append(javaSources.size()).append(" Java source files under `src/main/java`:\n\n");
@@ -299,17 +303,19 @@ public final class DnaReportService {
 
         md.append("## Growth notes for the next iteration\n\n");
         md.append("- Dominant canonical base: **").append(dominantBase(sequence)).append("**.\n");
-        md.append("- Hairpins: modal loop **").append(hairpins.modalLoop())
-                .append("** with **").append(hairpins.modalHairpins())
-                .append("** stems; adjacent (loop 0) **").append(hairpins.adjacent())
-                .append("**, gapped (loop ≥ 1) **").append(hairpins.gapped())
-                .append("**; longest adjacent **").append(hairpins.longestAdjacent())
-                .append("**, longest gapped **").append(hairpins.longestGapped())
-                .append("**. If loop 0 still wins, enclosure is not privileged over a solid ")
-                .append("palindrome; the next hypothesis should drop the gap or look at ")
-                .append("mismatches / stacking of adjacent stems.\n");
-        md.append("- Foldback remainder: RC **").append(foldback.rcStems())
-                .append("**, longest **").append(foldback.longestRc()).append("**.\n");
+        md.append("- Pairing mismatches: modal Hamming **").append(mismatches.modalDistance())
+                .append("**; distance-0 share **")
+                .append(String.format(Locale.ROOT, "%.4f", mismatches.zeroShare()))
+                .append("** vs expected **")
+                .append(String.format(Locale.ROOT, "%.4f", mismatches.zeroExpected()))
+                .append("** (enrichment **")
+                .append(String.format(Locale.ROOT, "%.3f", mismatches.zeroEnrichment()))
+                .append("**). If distance 0 is not enriched, exact pairing is chance and ")
+                .append("fuzzy search should be abandoned; if distance 1 is the mode, keep ")
+                .append("one-substitution search; if the histogram is binomial-flat, look at ")
+                .append("insertions (indel alignment) instead of substitutions.\n");
+        md.append("- Hairpin remainder: modal loop **").append(hairpins.modalLoop())
+                .append("**, adjacent **").append(hairpins.adjacent()).append("**.\n");
         md.append("- Homopolymer longest **").append(runs.longestBase()).append(" × ")
                 .append(runs.longestLength()).append("**.\n");
         md.append("- Module split (TZ §6.12) is **not** indicated: single Gradle module, no sub-module reports.\n");
@@ -334,21 +340,24 @@ public final class DnaReportService {
             CodonFrameCensus codons,
             SameBaseLagCensus lags,
             FoldbackCensus foldback,
-            HairpinCensus hairpins) {
+            HairpinCensus hairpins,
+            MismatchCensus mismatches) {
         long a = sequence.canonicalCounts().getOrDefault('A', 0L);
         long t = sequence.canonicalCounts().getOrDefault('T', 0L);
-        md.append("1. **R1 Pairing beats same-base reverse.** RC stems ")
-                .append(foldback.rcStems()).append(", longest ").append(foldback.longestRc())
-                .append(" vs same-base even ").append(foldback.sameEven())
-                .append("/").append(foldback.longestSame())
-                .append(". Global A=").append(a).append(", T=").append(t).append(".\n");
-        md.append("2. **R2 The center is often unpaired.** Odd RC ")
-                .append(foldback.rcOdd()).append(" vs even ").append(foldback.rcEven()).append(".\n");
-        md.append("3. **R3 Hairpin loops.** Modal loop ").append(hairpins.modalLoop())
-                .append(" (").append(hairpins.modalHairpins())
-                .append("); adjacent ").append(hairpins.adjacent())
-                .append(" vs gapped ").append(hairpins.gapped())
-                .append("; longest gapped stem ").append(hairpins.longestGapped()).append(".\n");
+        md.append("1. **R1 Exact enclosure is flat.** Hairpin modal loop ")
+                .append(hairpins.modalLoop()).append(" (").append(hairpins.modalHairpins())
+                .append(") vs adjacent ").append(hairpins.adjacent()).append(".\n");
+        md.append("2. **R2 Pairing mismatch profile.** Modal Hamming ")
+                .append(mismatches.modalDistance())
+                .append("; distance-0 share ")
+                .append(String.format(Locale.ROOT, "%.4f", mismatches.zeroShare()))
+                .append(" vs expected ")
+                .append(String.format(Locale.ROOT, "%.4f", mismatches.zeroExpected()))
+                .append(" (×")
+                .append(String.format(Locale.ROOT, "%.3f", mismatches.zeroEnrichment()))
+                .append("). Global A=").append(a).append(", T=").append(t).append(".\n");
+        md.append("3. **R3 Remainder foldback.** RC stems ").append(foldback.rcStems())
+                .append(", longest ").append(foldback.longestRc()).append(".\n");
         md.append("4. **R4 Remainder.** Wrap modal ").append(wraps.modalWidth())
                 .append("; GC spread ")
                 .append(String.format(Locale.ROOT, "%.2f", codons.maxGcSpread()))
