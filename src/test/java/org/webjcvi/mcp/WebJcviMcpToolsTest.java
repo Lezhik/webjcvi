@@ -46,6 +46,7 @@ class WebJcviMcpToolsTest {
                         "cut_tokens",
                         "kmer_stamps",
                         "find_palindromes",
+                        "extract_spans",
                         "list_files",
                         "read_file");
     }
@@ -94,7 +95,7 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Foldback stems");
+        assertThat(markdown).contains("Hairpin loops");
         assertThat(markdown).contains("Frame remainder");
     }
 
@@ -172,5 +173,15 @@ class WebJcviMcpToolsTest {
         assertThat(result).doesNotContain("hidden");
         assertThat(result).doesNotContain("TTTT");
         assertThat(tools.readFile("secret.txt")).isEqualTo("hidden ABBA");
+    }
+
+    @Test
+    void extractSpansDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "(hidden)");
+        String result = tools.extractSpans("(hello) () \"nope\"", 1);
+        assertThat(result).contains("hello");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(result).doesNotContain("nope");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("(hidden)");
     }
 }

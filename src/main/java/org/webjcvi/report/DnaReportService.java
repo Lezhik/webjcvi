@@ -18,6 +18,7 @@ import org.webjcvi.dna.DnaSequence;
 import org.webjcvi.dna.FoldbackCensus;
 import org.webjcvi.dna.FrameSkewCensus;
 import org.webjcvi.dna.GcIslandCensus;
+import org.webjcvi.dna.HairpinCensus;
 import org.webjcvi.dna.HomopolymerProfile;
 import org.webjcvi.dna.SameBaseLagCensus;
 import org.webjcvi.dna.SkewIslandCensus;
@@ -101,10 +102,11 @@ public final class DnaReportService {
         CodonFrameCensus codons = CodonFrameCensus.from(sequence);
         SameBaseLagCensus lags = SameBaseLagCensus.from(sequence);
         FoldbackCensus foldback = FoldbackCensus.from(sequence);
+        HairpinCensus hairpins = HairpinCensus.from(sequence);
         Map<String, String> sections = buildSections(
-                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback);
+                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins);
         String markdown = renderMarkdown(
-                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback);
+                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins);
         storage.writeText(reportRelativePath(), markdown);
         return new DnaReport(generatedAt, sequence, sections, markdown);
     }
@@ -156,7 +158,8 @@ public final class DnaReportService {
             GcIslandCensus gcIslands,
             CodonFrameCensus codons,
             SameBaseLagCensus lags,
-            FoldbackCensus foldback) {
+            FoldbackCensus foldback,
+            HairpinCensus hairpins) {
         Map<String, String> sections = new LinkedHashMap<>();
         sections.put("meta", "generatedAt=" + ISO.format(generatedAt));
         sections.put("length", Integer.toString(sequence.length()));
@@ -165,10 +168,10 @@ public final class DnaReportService {
         sections.put("invalidTotal", Long.toString(sequence.invalidTotal()));
         sections.put("javaSourceCount", Integer.toString(javaSources.size()));
         sections.put("wrapModalWidth", Integer.toString(wraps.modalWidth()));
-        sections.put("rcStems", Integer.toString(foldback.rcStems()));
-        sections.put("longestRc", Integer.toString(foldback.longestRc()));
-        sections.put("sameEvenPalindromes", Integer.toString(foldback.sameEven()));
-        sections.put("longestSamePalindrome", Integer.toString(foldback.longestSame()));
+        sections.put("modalLoop", Integer.toString(hairpins.modalLoop()));
+        sections.put("modalHairpins", Integer.toString(hairpins.modalHairpins()));
+        sections.put("adjacentHairpins", Integer.toString(hairpins.adjacent()));
+        sections.put("gappedHairpins", Integer.toString(hairpins.gapped()));
         sections.put("longestHomopolymer", runs.longestBase() + "x" + runs.longestLength());
         return sections;
     }
@@ -187,15 +190,16 @@ public final class DnaReportService {
             GcIslandCensus gcIslands,
             CodonFrameCensus codons,
             SameBaseLagCensus lags,
-            FoldbackCensus foldback) {
+            FoldbackCensus foldback,
+            HairpinCensus hairpins) {
         StringBuilder md = new StringBuilder();
         md.append("# WebJCVI DNA Report\n\n");
         md.append("Generated at **").append(ISO.format(generatedAt.atOffset(ZoneOffset.UTC))).append("**.\n\n");
         md.append("This report is rebuilt from `").append(dnaRelativePath)
-                .append("` and a snapshot of the current codebase. Version 9 of the builder ")
-                .append("counts reverse-complement foldback stems (A↔T, G↔C around a center) ")
-                .append("versus same-base palindromes. Forward lags were nearly independent ")
-                .append("(peak ×1.134); this asks whether identity folds instead.\n\n");
+                .append("` and a snapshot of the current codebase. Version 10 of the builder ")
+                .append("counts reverse-complement hairpins by loop width (the unpaired gap ")
+                .append("between stem halves). Adjacent foldback mixed stem with center; this ")
+                .append("asks whether enclosure (loop ≥ 1) actually outruns a solid palindrome.\n\n");
 
         md.append("## Sequence composition\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
@@ -236,22 +240,35 @@ public final class DnaReportService {
         md.append("First ").append(PREVIEW_BASES).append(" normalized bases:\n\n```\n");
         md.append(sequence.preview(PREVIEW_BASES)).append("\n```\n\n");
 
-        md.append("## Foldback stems\n\n");
-        md.append("Reverse-complement palindromes of length ≥ 4 (A pairs with T, G with C) ")
-                .append("versus even same-base palindromes that are not homopolymers. ")
-                .append("Pair counts are the complementary contacts inside RC stems.\n\n");
-        md.append("| Metric | Value |\n| --- | --- |\n");
-        md.append("| RC stems (even+odd) | ").append(foldback.rcStems()).append(" |\n");
-        md.append("| RC even / odd | ").append(foldback.rcEven()).append(" / ").append(foldback.rcOdd()).append(" |\n");
-        md.append("| Longest RC stem | ").append(foldback.longestRc()).append(" |\n");
-        md.append("| AT pairs in RC stems | ").append(foldback.rcAtPairs()).append(" |\n");
-        md.append("| GC pairs in RC stems | ").append(foldback.rcGcPairs()).append(" |\n");
-        md.append("| Same-base even palindromes | ").append(foldback.sameEven()).append(" |\n");
-        md.append("| Longest same-base palindrome | ").append(foldback.longestSame()).append(" |\n\n");
-        md.append("`").append(foldback.toTextRow()).append("`\n\n");
+        md.append("## Hairpin loops\n\n");
+        md.append("Reverse-complement stems of paired length ≥ 4, split by the unpaired ")
+                .append("loop between the two halves. Loop 0 is an even adjacent palindrome; ")
+                .append("loop 1 is the odd-center case; larger loops are true hairpin gaps.\n\n");
+        md.append("| Loop | Hairpins | Longest stem | AT pairs | GC pairs |\n| --- | --- | --- | --- | --- |\n");
+        for (var row : hairpins.rows()) {
+            md.append("| ").append(row.loop()).append(" | ")
+                    .append(row.hairpins()).append(" | ")
+                    .append(row.longestStem()).append(" | ")
+                    .append(row.atPairs()).append(" | ")
+                    .append(row.gcPairs()).append(" |\n");
+        }
+        md.append("\n| Metric | Value |\n| --- | --- |\n");
+        md.append("| Modal loop | ").append(hairpins.modalLoop()).append(" |\n");
+        md.append("| Hairpins at modal loop | ").append(hairpins.modalHairpins()).append(" |\n");
+        md.append("| Adjacent (loop 0) | ").append(hairpins.adjacent()).append(" |\n");
+        md.append("| Gapped (loop ≥ 1) | ").append(hairpins.gapped()).append(" |\n");
+        md.append("| Longest adjacent stem | ").append(hairpins.longestAdjacent()).append(" |\n");
+        md.append("| Longest gapped stem | ").append(hairpins.longestGapped()).append(" |\n\n");
+        md.append("`").append(hairpins.toTextRow()).append("`\n\n");
 
         md.append("## Frame remainder\n\n");
-        md.append("Same-base lags: peak lag **").append(lags.peakLag())
+        md.append("Foldback RC stems **").append(foldback.rcStems())
+                .append("**, longest **").append(foldback.longestRc())
+                .append("**, even/odd **").append(foldback.rcEven()).append("/")
+                .append(foldback.rcOdd())
+                .append("**. Same-base even palindromes **").append(foldback.sameEven())
+                .append("**, longest **").append(foldback.longestSame())
+                .append("**. Same-base lags: peak lag **").append(lags.peakLag())
                 .append("** enrichment **")
                 .append(String.format(Locale.ROOT, "%.3f", lags.peakEnrichment()))
                 .append("** vs independence **")
@@ -259,7 +276,6 @@ public final class DnaReportService {
                 .append("**. Codon GC spread **")
                 .append(String.format(Locale.ROOT, "%.2f", codons.maxGcSpread()))
                 .append("**. GC islands longest **").append(gcIslands.longestGc())
-                .append("**, AT longest **").append(gcIslands.longestAt())
                 .append("**. Wrap modal **").append(wraps.modalWidth())
                 .append("**. Homopolymer longest **")
                 .append(runs.longestBase()).append(" × ").append(runs.longestLength())
@@ -268,7 +284,7 @@ public final class DnaReportService {
                 .append("**.\n\n");
 
         md.append("## Extracted tape rules\n\n");
-        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback);
+        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins);
 
         md.append("## Codebase snapshot\n\n");
         md.append(javaSources.size()).append(" Java source files under `src/main/java`:\n\n");
@@ -283,20 +299,17 @@ public final class DnaReportService {
 
         md.append("## Growth notes for the next iteration\n\n");
         md.append("- Dominant canonical base: **").append(dominantBase(sequence)).append("**.\n");
-        md.append("- Foldback: RC stems **").append(foldback.rcStems())
-                .append("**, longest **").append(foldback.longestRc())
-                .append("**, even/odd **").append(foldback.rcEven()).append("/")
-                .append(foldback.rcOdd())
-                .append("**, AT/GC pairs **").append(foldback.rcAtPairs()).append("/")
-                .append(foldback.rcGcPairs())
-                .append("**. Same-base even palindromes **").append(foldback.sameEven())
-                .append("**, longest **").append(foldback.longestSame())
-                .append("**. If RC stems are no longer than same-base palindromes, foldback ")
-                .append("is not privileged over letter palindromes; the next hypothesis should ")
-                .append("drop pairing or look at stem stacking / hairpin gaps.\n");
-        md.append("- Same-base lag remainder: peak **").append(lags.peakLag())
-                .append("** × ")
-                .append(String.format(Locale.ROOT, "%.3f", lags.peakEnrichment())).append(".\n");
+        md.append("- Hairpins: modal loop **").append(hairpins.modalLoop())
+                .append("** with **").append(hairpins.modalHairpins())
+                .append("** stems; adjacent (loop 0) **").append(hairpins.adjacent())
+                .append("**, gapped (loop ≥ 1) **").append(hairpins.gapped())
+                .append("**; longest adjacent **").append(hairpins.longestAdjacent())
+                .append("**, longest gapped **").append(hairpins.longestGapped())
+                .append("**. If loop 0 still wins, enclosure is not privileged over a solid ")
+                .append("palindrome; the next hypothesis should drop the gap or look at ")
+                .append("mismatches / stacking of adjacent stems.\n");
+        md.append("- Foldback remainder: RC **").append(foldback.rcStems())
+                .append("**, longest **").append(foldback.longestRc()).append("**.\n");
         md.append("- Homopolymer longest **").append(runs.longestBase()).append(" × ")
                 .append(runs.longestLength()).append("**.\n");
         md.append("- Module split (TZ §6.12) is **not** indicated: single Gradle module, no sub-module reports.\n");
@@ -320,20 +333,22 @@ public final class DnaReportService {
             GcIslandCensus gcIslands,
             CodonFrameCensus codons,
             SameBaseLagCensus lags,
-            FoldbackCensus foldback) {
+            FoldbackCensus foldback,
+            HairpinCensus hairpins) {
         long a = sequence.canonicalCounts().getOrDefault('A', 0L);
         long t = sequence.canonicalCounts().getOrDefault('T', 0L);
-        md.append("1. **R1 Forward identity is nearly chance.** Peak lag ")
-                .append(lags.peakLag()).append(" enrichment ")
-                .append(String.format(Locale.ROOT, "%.3f", lags.peakEnrichment()))
-                .append("; lag 2 is the depleted slot.\n");
-        md.append("2. **R2 Chargaff is a fold, not a forward lag.** RC stems ")
+        md.append("1. **R1 Pairing beats same-base reverse.** RC stems ")
                 .append(foldback.rcStems()).append(", longest ").append(foldback.longestRc())
-                .append(", even/odd ").append(foldback.rcEven()).append("/").append(foldback.rcOdd())
+                .append(" vs same-base even ").append(foldback.sameEven())
+                .append("/").append(foldback.longestSame())
                 .append(". Global A=").append(a).append(", T=").append(t).append(".\n");
-        md.append("3. **R3 Same-base palindromes are the text analog.** ")
-                .append(foldback.sameEven()).append(" even non-homopolymer palindromes, longest ")
-                .append(foldback.longestSame()).append(".\n");
+        md.append("2. **R2 The center is often unpaired.** Odd RC ")
+                .append(foldback.rcOdd()).append(" vs even ").append(foldback.rcEven()).append(".\n");
+        md.append("3. **R3 Hairpin loops.** Modal loop ").append(hairpins.modalLoop())
+                .append(" (").append(hairpins.modalHairpins())
+                .append("); adjacent ").append(hairpins.adjacent())
+                .append(" vs gapped ").append(hairpins.gapped())
+                .append("; longest gapped stem ").append(hairpins.longestGapped()).append(".\n");
         md.append("4. **R4 Remainder.** Wrap modal ").append(wraps.modalWidth())
                 .append("; GC spread ")
                 .append(String.format(Locale.ROOT, "%.2f", codons.maxGcSpread()))
@@ -350,6 +365,9 @@ public final class DnaReportService {
                 .append(runs.longestBase()).append("×").append(runs.longestLength())
                 .append("; mean |AT-skew| ")
                 .append(String.format(Locale.ROOT, "%.4f", skew.meanAbsAtSkew()))
+                .append("; peak lag ").append(lags.peakLag())
+                .append(" × ")
+                .append(String.format(Locale.ROOT, "%.3f", lags.peakEnrichment()))
                 .append(".\n\n");
     }
 

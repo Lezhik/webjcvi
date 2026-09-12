@@ -27,7 +27,7 @@
     </style>
 </head>
 <body>
-    <nav><a href="/">← Home</a> · <a href="/tape">Scratch tape</a> · <a href="/split">Banner split</a> · <a href="/drift">Pair drift</a> · <a href="/reflow">Unwrap</a> · <a href="/rare">Rare islands</a> · <a href="/stamps">Stamps</a> · <a href="/fold">Fold</a></nav>
+    <nav><a href="/">← Home</a> · <a href="/tape">Scratch tape</a> · <a href="/split">Banner split</a> · <a href="/drift">Pair drift</a> · <a href="/reflow">Unwrap</a> · <a href="/rare">Rare islands</a> · <a href="/stamps">Stamps</a> · <a href="/fold">Fold</a> · <a href="/loop">Loops</a></nav>
     <h1>Rare-break tokens</h1>
     <p>Treats the bottom <strong>24.14%</strong> of symbol mass as <em>breaks</em>
         (DNA GC islands: longest 9, none ≥ 10) and lists the majority-class

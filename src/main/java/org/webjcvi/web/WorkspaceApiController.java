@@ -15,6 +15,7 @@ import org.webjcvi.reflow.WrapReflow;
 import org.webjcvi.token.RareBreakTokenizer;
 import org.webjcvi.stamp.KmerStamp;
 import org.webjcvi.fold.PalindromeScan;
+import org.webjcvi.loop.StemLoop;
 import org.webjcvi.report.DnaReport;
 import org.webjcvi.report.DnaReportService;
 import org.webjcvi.segment.BannerSplitter;
@@ -42,6 +43,7 @@ public class WorkspaceApiController {
     private final RareBreakTokenizer tokenizer;
     private final KmerStamp stamp;
     private final PalindromeScan palindromes;
+    private final StemLoop loops;
 
     public WorkspaceApiController(
             FileStorageService storage,
@@ -53,7 +55,8 @@ public class WorkspaceApiController {
             RareClassScanner rareScanner,
             RareBreakTokenizer tokenizer,
             KmerStamp stamp,
-            PalindromeScan palindromes) {
+            PalindromeScan palindromes,
+            StemLoop loops) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
@@ -64,6 +67,7 @@ public class WorkspaceApiController {
         this.tokenizer = tokenizer;
         this.stamp = stamp;
         this.palindromes = palindromes;
+        this.loops = loops;
     }
 
     @GetMapping("/files")
@@ -321,6 +325,37 @@ public class WorkspaceApiController {
                                 row.put("offset", hit.offset());
                                 row.put("length", hit.length());
                                 row.put("preview", hit.preview());
+                                return row;
+                            })
+                            .toList());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/loop")
+    public Mono<Map<String, Object>> extractSpans(
+            @RequestParam("text") String text,
+            @RequestParam(name = "min", defaultValue = "1") int minLoop) {
+        return Mono.fromCallable(() -> {
+                    var scan = loops.extract(text, minLoop);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("scanned", scan.scanned());
+                    body.put("spanCount", scan.spanCount());
+                    body.put("nested", scan.nested());
+                    body.put("leftoverOpens", scan.leftoverOpens());
+                    body.put("leftoverCloses", scan.leftoverCloses());
+                    body.put("longestLoop", scan.longestLoop());
+                    body.put("spans", scan.spans().stream()
+                            .map(span -> {
+                                Map<String, Object> row = new LinkedHashMap<>();
+                                row.put("index", span.index());
+                                row.put("offset", span.offset());
+                                row.put("length", span.length());
+                                row.put("loopLength", span.loopLength());
+                                row.put("opener", span.opener());
+                                row.put("closer", span.closer());
+                                row.put("preview", span.preview());
                                 return row;
                             })
                             .toList());

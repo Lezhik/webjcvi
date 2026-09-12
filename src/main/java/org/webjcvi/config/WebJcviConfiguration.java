@@ -15,6 +15,7 @@ import org.webjcvi.reflow.WrapReflow;
 import org.webjcvi.token.RareBreakTokenizer;
 import org.webjcvi.stamp.KmerStamp;
 import org.webjcvi.fold.PalindromeScan;
+import org.webjcvi.loop.StemLoop;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -73,6 +74,11 @@ public class WebJcviConfiguration {
     @Bean
     PalindromeScan palindromeScan() {
         return new PalindromeScan();
+    }
+
+    @Bean
+    StemLoop stemLoop() {
+        return new StemLoop();
     }
 
     @Bean

@@ -123,6 +123,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/tokens");
                     assertThat(html).contains("/stamps");
                     assertThat(html).contains("/fold");
+                    assertThat(html).contains("/loop");
                 });
     }
 
@@ -443,6 +444,46 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("ABBA");
                     assertThat(html).doesNotContain("TTTT");
                     assertThat(html).contains("palindrome");
+                });
+    }
+
+    @Test
+    void loopApiExtractsComplementarySpan() {
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/loop")
+                        .queryParam("text", "(hello) () \"nope\"")
+                        .queryParam("min", "1")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.spanCount").isEqualTo(1)
+                .jsonPath("$.spans[0].preview").isEqualTo("hello");
+    }
+
+    @Test
+    void loopPageRenders() {
+        webTestClient.get()
+                .uri("/loop")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Stem loops"));
+    }
+
+    @Test
+    void loopPageFormExtractsComplementarySpan() {
+        webTestClient.post()
+                .uri("/loop")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=%28hello%29+%28%29+%22nope%22&min=1")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("hello");
+                    assertThat(html).doesNotContain("nope");
+                    assertThat(html).contains("span");
                 });
     }
 }

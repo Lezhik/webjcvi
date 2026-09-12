@@ -17,6 +17,7 @@ import org.webjcvi.tape.TapeException;
 import org.webjcvi.token.TokenException;
 import org.webjcvi.stamp.StampException;
 import org.webjcvi.fold.FoldException;
+import org.webjcvi.loop.LoopException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
@@ -67,6 +68,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> fold(FoldException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "fold", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(LoopException.class)
+    ResponseEntity<Map<String, String>> loop(LoopException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "loop", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

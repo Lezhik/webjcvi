@@ -25,6 +25,8 @@ import org.webjcvi.stamp.KmerStamp;
 import org.webjcvi.stamp.StampException;
 import org.webjcvi.fold.FoldException;
 import org.webjcvi.fold.PalindromeScan;
+import org.webjcvi.loop.LoopException;
+import org.webjcvi.loop.StemLoop;
 
 /**
  * MCP tool surface. File tools go through {@link FileStorageService}. The
@@ -44,11 +46,12 @@ public class WebJcviMcpTools {
     private final RareBreakTokenizer tokenizer;
     private final KmerStamp stamp;
     private final PalindromeScan palindromes;
+    private final StemLoop loops;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
         this(storage, reports, new ScratchTape(), new BannerSplitter(), new PairDrift(),
                 new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer(), new KmerStamp(),
-                new PalindromeScan());
+                new PalindromeScan(), new StemLoop());
     }
 
     @Autowired
@@ -62,7 +65,8 @@ public class WebJcviMcpTools {
             RareClassScanner rare,
             RareBreakTokenizer tokenizer,
             KmerStamp stamp,
-            PalindromeScan palindromes) {
+            PalindromeScan palindromes,
+            StemLoop loops) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
@@ -73,6 +77,7 @@ public class WebJcviMcpTools {
         this.tokenizer = tokenizer;
         this.stamp = stamp;
         this.palindromes = palindromes;
+        this.loops = loops;
     }
 
     @Tool(name = "regenerate_dna_report", description = "Clear prior reports and rebuild the DNA report from jcvi-dna.txt and the current codebase.")
@@ -303,6 +308,30 @@ public class WebJcviMcpTools {
         });
     }
 
+    @Tool(name = "extract_spans", description = "Extract complementary delimiter spans (()[]{}<>) and the loop they enclose from caller-supplied text. Skips quotes (same-base analog). Default min loop 1. Not the DNA file and not a project path.")
+    public String extractSpans(
+            @ToolParam(description = "Arbitrary text to scan") String text,
+            @ToolParam(description = "Minimum loop length; use 1 unless you need a different floor") int minLoop) {
+        return run(() -> {
+            int floor = minLoop < 1 ? StemLoop.DEFAULT_MIN_LOOP : minLoop;
+            var scan = loops.extract(text, floor);
+            StringBuilder out = new StringBuilder(scan.summary()).append('\n');
+            if (scan.spans().isEmpty()) {
+                out.append("(no spans)");
+                return out.toString();
+            }
+            for (var span : scan.spans()) {
+                out.append("#").append(span.index())
+                        .append(" ").append(span.opener()).append("…").append(span.closer())
+                        .append(" offset ").append(span.offset())
+                        .append(" loop ").append(span.loopLength())
+                        .append('\n')
+                        .append(span.preview()).append('\n');
+            }
+            return out.toString();
+        });
+    }
+
     @Tool(name = "list_files", description = "List files inside the project directory. Paths must be relative to the project root.")
     public String listFiles(
             @ToolParam(description = "Relative directory to list, or '.' for the project root") String path,
@@ -327,7 +356,7 @@ public class WebJcviMcpTools {
         try {
             return action.execute();
         } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException
-                 | RareException | TokenException | StampException | FoldException e) {
+                 | RareException | TokenException | StampException | FoldException | LoopException e) {
             return "Error: " + e.getMessage();
         }
     }

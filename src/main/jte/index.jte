@@ -41,6 +41,7 @@
         <p><a href="/tokens">Rare-break tokens</a> (split on the rare class, keep the majority words).</p>
         <p><a href="/stamps">K-mer stamps</a> (rank overlapping 3-mers — the phase-invariant mode of a paste).</p>
         <p><a href="/fold">Fold palindromes</a> (even mirrored spans, not homopolymers).</p>
+        <p><a href="/loop">Stem loops</a> (extract complementary bracket spans and the enclosed loop).</p>
         <form method="post" action="/report/regenerate">
             <button type="submit">Regenerate report</button>
         </form>
