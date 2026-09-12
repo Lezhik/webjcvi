@@ -21,6 +21,7 @@ import org.webjcvi.loop.LoopException;
 import org.webjcvi.fuzzy.FuzzyException;
 import org.webjcvi.contrast.ContrastException;
 import org.webjcvi.mirror.MirrorException;
+import org.webjcvi.seam.SeamException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
@@ -95,6 +96,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> mirror(MirrorException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "mirror", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(SeamException.class)
+    ResponseEntity<Map<String, String>> seam(SeamException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "seam", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

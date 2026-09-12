@@ -45,6 +45,7 @@
         <p><a href="/fuzzy">Fuzzy find</a> (Hamming-near motif search — exact pairing is background).</p>
         <p><a href="/contrast">Block contrast</a> (adjacent-window stutters — neighbors should differ).</p>
         <p><a href="/mirror">Mirror joints</a> (adjacent reverse blocks that are not copies).</p>
+        <p><a href="/seam">Seam guard</a> (palindromic glue at hard-wrap line joints).</p>
         <form method="post" action="/report/regenerate">
             <button type="submit">Regenerate report</button>
         </form>

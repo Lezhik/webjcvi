@@ -20,6 +20,7 @@ import org.webjcvi.fuzzy.FuzzyFind;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.contrast.BlockContrast;
 import org.webjcvi.mirror.MirrorJoint;
+import org.webjcvi.seam.SeamGuard;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -98,6 +99,11 @@ public class WebJcviConfiguration {
     @Bean
     MirrorJoint mirrorJoint() {
         return new MirrorJoint();
+    }
+
+    @Bean
+    SeamGuard seamGuard() {
+        return new SeamGuard();
     }
 
     @Bean

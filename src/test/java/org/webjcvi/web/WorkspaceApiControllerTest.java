@@ -127,6 +127,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/fuzzy");
                     assertThat(html).contains("/contrast");
                     assertThat(html).contains("/mirror");
+                    assertThat(html).contains("/seam");
                 });
     }
 
@@ -613,6 +614,51 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void seamApiFlagsFullWidthReverseJoints() {
+        String left = "x".repeat(66) + "ABCD";
+        String right = "DCBA" + "y".repeat(66);
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/seam")
+                        .queryParam("text", left + "\n" + right)
+                        .queryParam("wrap", "70")
+                        .queryParam("block", "4")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.hitCount").isEqualTo(1)
+                .jsonPath("$.hits[0].left").isEqualTo("ABCD")
+                .jsonPath("$.hits[0].right").isEqualTo("DCBA");
+    }
+
+    @Test
+    void seamPageRenders() {
+        webTestClient.get()
+                .uri("/seam")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Seam guard"));
+    }
+
+    @Test
+    void seamPageFormFlagsFullWidthReverseJoints() {
+        String left = "x".repeat(66) + "ABCD";
+        String right = "DCBA" + "y".repeat(66);
+        webTestClient.post()
+                .uri("/seam")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=" + left + "%0A" + right + "&wrap=70&block=4")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("ABCD");
+                    assertThat(html).contains("DCBA");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -634,6 +680,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.spans.spanCount").isNumber()
                 .jsonPath("$.fuzzy.skipped").isBoolean()
                 .jsonPath("$.contrast.stutterCount").isNumber()
-                .jsonPath("$.mirrors.jointCount").isNumber();
+                .jsonPath("$.mirrors.jointCount").isNumber()
+                .jsonPath("$.seams.hitCount").isNumber();
     }
 }

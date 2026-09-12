@@ -21,7 +21,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
         "spans",
         "fuzzy",
         "contrast",
-        "mirrors"
+        "mirrors",
+        "seams"
 })
 public record LogAnalysisReport(
         int apiVersion,
@@ -38,7 +39,8 @@ public record LogAnalysisReport(
         SpanSection spans,
         FuzzySection fuzzy,
         ContrastSection contrast,
-        MirrorSection mirrors) {
+        MirrorSection mirrors,
+        SeamSection seams) {
 
     @JsonPropertyOrder({"length", "runCount", "longestRun"})
     public record TapeSection(int length, int runCount, int longestRun) {
@@ -103,5 +105,9 @@ public record LogAnalysisReport(
 
     @JsonPropertyOrder({"scanned", "jointCount", "width"})
     public record MirrorSection(int scanned, int jointCount, int width) {
+    }
+
+    @JsonPropertyOrder({"scanned", "hitCount", "wrapWidth", "blockWidth"})
+    public record SeamSection(int scanned, int hitCount, int wrapWidth, int blockWidth) {
     }
 }

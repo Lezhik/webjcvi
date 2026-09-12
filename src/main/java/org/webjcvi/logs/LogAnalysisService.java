@@ -17,6 +17,7 @@ import org.webjcvi.tape.ScratchTape;
 import org.webjcvi.token.RareBreakTokenizer;
 import org.webjcvi.contrast.BlockContrast;
 import org.webjcvi.mirror.MirrorJoint;
+import org.webjcvi.seam.SeamGuard;
 
 /**
  * Fixed-API facade over the text-processing algorithms for log analysis.
@@ -45,11 +46,12 @@ public final class LogAnalysisService {
     private final FuzzyFind fuzzy;
     private final BlockContrast contrast;
     private final MirrorJoint mirrors;
+    private final SeamGuard seams;
 
     public LogAnalysisService() {
         this(new BannerSplitter(), new PairDrift(), new WrapReflow(), new RareClassScanner(),
                 new RareBreakTokenizer(), new KmerStamp(), new PalindromeScan(), new StemLoop(),
-                new FuzzyFind(), new BlockContrast(), new MirrorJoint());
+                new FuzzyFind(), new BlockContrast(), new MirrorJoint(), new SeamGuard());
     }
 
     public LogAnalysisService(
@@ -63,7 +65,8 @@ public final class LogAnalysisService {
             StemLoop loops,
             FuzzyFind fuzzy,
             BlockContrast contrast,
-            MirrorJoint mirrors) {
+            MirrorJoint mirrors,
+            SeamGuard seams) {
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
@@ -75,6 +78,7 @@ public final class LogAnalysisService {
         this.fuzzy = fuzzy;
         this.contrast = contrast;
         this.mirrors = mirrors;
+        this.seams = seams;
     }
 
     /**
@@ -177,6 +181,13 @@ public final class LogAnalysisService {
                 mirrorScan.jointCount(),
                 mirrorScan.width());
 
+        var seamScan = seams.scan(payload);
+        var seamSection = new LogAnalysisReport.SeamSection(
+                seamScan.scanned(),
+                seamScan.hitCount(),
+                seamScan.wrapWidth(),
+                seamScan.blockWidth());
+
         LogAnalysisReport report = new LogAnalysisReport(
                 API_VERSION,
                 inputLength,
@@ -192,9 +203,10 @@ public final class LogAnalysisService {
                 spanSection,
                 fuzzySection,
                 contrastSection,
-                mirrorSection);
+                mirrorSection,
+                seamSection);
         if (log.isDebugEnabled()) {
-            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={}",
+            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={}",
                     truncated,
                     tapeSection.runCount(),
                     bannerSection.sectionCount(),
@@ -205,7 +217,8 @@ public final class LogAnalysisService {
                     spanSection.spanCount(),
                     fuzzySection.hitCount(),
                     contrastSection.stutterCount(),
-                    mirrorSection.jointCount());
+                    mirrorSection.jointCount(),
+                    seamSection.hitCount());
         }
         return report;
     }

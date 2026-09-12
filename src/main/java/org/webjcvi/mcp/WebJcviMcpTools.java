@@ -33,6 +33,8 @@ import org.webjcvi.contrast.BlockContrast;
 import org.webjcvi.contrast.ContrastException;
 import org.webjcvi.mirror.MirrorException;
 import org.webjcvi.mirror.MirrorJoint;
+import org.webjcvi.seam.SeamException;
+import org.webjcvi.seam.SeamGuard;
 import org.webjcvi.logs.LogAnalysisService;
 
 /**
@@ -57,13 +59,14 @@ public class WebJcviMcpTools {
     private final FuzzyFind fuzzy;
     private final BlockContrast contrast;
     private final MirrorJoint mirrors;
+    private final SeamGuard seams;
     private final LogAnalysisService logAnalysis;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
         this(storage, reports, new ScratchTape(), new BannerSplitter(), new PairDrift(),
                 new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer(), new KmerStamp(),
                 new PalindromeScan(), new StemLoop(), new FuzzyFind(), new BlockContrast(),
-                new MirrorJoint(), new LogAnalysisService());
+                new MirrorJoint(), new SeamGuard(), new LogAnalysisService());
     }
 
     @Autowired
@@ -82,6 +85,7 @@ public class WebJcviMcpTools {
             FuzzyFind fuzzy,
             BlockContrast contrast,
             MirrorJoint mirrors,
+            SeamGuard seams,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -97,6 +101,7 @@ public class WebJcviMcpTools {
         this.fuzzy = fuzzy;
         this.contrast = contrast;
         this.mirrors = mirrors;
+        this.seams = seams;
         this.logAnalysis = logAnalysis;
     }
 
@@ -424,6 +429,31 @@ public class WebJcviMcpTools {
         });
     }
 
+    @Tool(name = "flag_seams", description = "Flag palindromic wrap seams in caller-supplied text: last 4 chars of a full-width line are the reverse of the first 4 of the next, but not a copy. Default wrap 70, block 4. Not the DNA file and not a project path.")
+    public String flagSeams(
+            @ToolParam(description = "Arbitrary text to scan") String text,
+            @ToolParam(description = "Minimum line width that counts as a wrap; use 70 unless you need a different floor") int wrapWidth,
+            @ToolParam(description = "Block width at the seam; use 4 unless you need a different floor") int blockWidth) {
+        return run(() -> {
+            int wrap = wrapWidth < 8 ? SeamGuard.DEFAULT_WRAP : wrapWidth;
+            int block = blockWidth < 2 ? SeamGuard.DEFAULT_BLOCK : blockWidth;
+            var scan = seams.scan(text, wrap, block);
+            StringBuilder out = new StringBuilder(scan.summary()).append('\n');
+            if (scan.hits().isEmpty()) {
+                out.append("(no seams)");
+                return out.toString();
+            }
+            for (var hit : scan.hits()) {
+                out.append("#").append(hit.index())
+                        .append(" line ").append(hit.line())
+                        .append(" identity ").append(hit.identityDistance())
+                        .append('\n')
+                        .append(hit.left()).append(" | ").append(hit.right()).append('\n');
+            }
+            return out.toString();
+        });
+    }
+
     @Tool(name = "analyze_logs", description = "Analyze caller-supplied log text with the shared log-analysis facade. Returns a JSON report. Not the DNA file. Truncates at 524288 characters.")
     public String analyzeLogs(
             @ToolParam(description = "Log text to analyze") String text) {
@@ -455,7 +485,7 @@ public class WebJcviMcpTools {
             return action.execute();
         } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException
                  | RareException | TokenException | StampException | FoldException | LoopException
-                 | FuzzyException | ContrastException | MirrorException e) {
+                 | FuzzyException | ContrastException | MirrorException | SeamException e) {
             return "Error: " + e.getMessage();
         }
     }

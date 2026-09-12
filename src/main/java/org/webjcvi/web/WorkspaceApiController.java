@@ -19,6 +19,7 @@ import org.webjcvi.loop.StemLoop;
 import org.webjcvi.fuzzy.FuzzyFind;
 import org.webjcvi.contrast.BlockContrast;
 import org.webjcvi.mirror.MirrorJoint;
+import org.webjcvi.seam.SeamGuard;
 import org.webjcvi.logs.LogAnalysisReport;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.report.DnaReport;
@@ -52,6 +53,7 @@ public class WorkspaceApiController {
     private final FuzzyFind fuzzy;
     private final BlockContrast contrast;
     private final MirrorJoint mirrors;
+    private final SeamGuard seams;
     private final LogAnalysisService logAnalysis;
 
     public WorkspaceApiController(
@@ -69,6 +71,7 @@ public class WorkspaceApiController {
             FuzzyFind fuzzy,
             BlockContrast contrast,
             MirrorJoint mirrors,
+            SeamGuard seams,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -84,6 +87,7 @@ public class WorkspaceApiController {
         this.fuzzy = fuzzy;
         this.contrast = contrast;
         this.mirrors = mirrors;
+        this.seams = seams;
         this.logAnalysis = logAnalysis;
     }
 
@@ -453,6 +457,34 @@ public class WorkspaceApiController {
                                 Map<String, Object> row = new LinkedHashMap<>();
                                 row.put("index", hit.index());
                                 row.put("offset", hit.offset());
+                                row.put("identityDistance", hit.identityDistance());
+                                row.put("left", hit.left());
+                                row.put("right", hit.right());
+                                return row;
+                            })
+                            .toList());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/seam")
+    public Mono<Map<String, Object>> flagSeams(
+            @RequestParam("text") String text,
+            @RequestParam(name = "wrap", defaultValue = "70") int wrapWidth,
+            @RequestParam(name = "block", defaultValue = "4") int blockWidth) {
+        return Mono.fromCallable(() -> {
+                    var scan = seams.scan(text, wrapWidth, blockWidth);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("wrapWidth", scan.wrapWidth());
+                    body.put("blockWidth", scan.blockWidth());
+                    body.put("scanned", scan.scanned());
+                    body.put("hitCount", scan.hitCount());
+                    body.put("hits", scan.hits().stream()
+                            .map(hit -> {
+                                Map<String, Object> row = new LinkedHashMap<>();
+                                row.put("index", hit.index());
+                                row.put("line", hit.line());
                                 row.put("identityDistance", hit.identityDistance());
                                 row.put("left", hit.left());
                                 row.put("right", hit.right());

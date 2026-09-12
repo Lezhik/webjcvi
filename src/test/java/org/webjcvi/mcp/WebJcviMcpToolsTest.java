@@ -50,6 +50,7 @@ class WebJcviMcpToolsTest {
                         "fuzzy_find",
                         "block_contrast",
                         "find_mirrors",
+                        "flag_seams",
                         "analyze_logs",
                         "list_files",
                         "read_file");
@@ -99,7 +100,7 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Wrap reverse");
+        assertThat(markdown).contains("Reverse phase");
         assertThat(markdown).contains("Frame remainder");
     }
 
@@ -216,6 +217,18 @@ class WebJcviMcpToolsTest {
         assertThat(result).contains("ABCD | DCBA");
         assertThat(result).doesNotContain("hidden");
         assertThat(tools.readFile("secret.txt")).isEqualTo("abcddcba-hidden");
+    }
+
+    @Test
+    void flagSeamsDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "ABCD-hidden");
+        String left = "x".repeat(66) + "ABCD";
+        String right = "DCBA" + "y".repeat(66);
+        String result = tools.flagSeams(left + "\n" + right, 70, 4);
+        assertThat(result).contains("hits=1");
+        assertThat(result).contains("ABCD | DCBA");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("ABCD-hidden");
     }
 
     @Test
