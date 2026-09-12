@@ -23,6 +23,7 @@ import org.webjcvi.seam.SeamGuard;
 import org.webjcvi.phase.PhaseJoint;
 import org.webjcvi.frame.FrameFields;
 import org.webjcvi.clone.CloneScan;
+import org.webjcvi.prefix.PrefixGroup;
 import org.webjcvi.logs.LogAnalysisReport;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.report.DnaReport;
@@ -60,6 +61,7 @@ public class WorkspaceApiController {
     private final PhaseJoint phase;
     private final FrameFields fields;
     private final CloneScan clones;
+    private final PrefixGroup prefixes;
     private final LogAnalysisService logAnalysis;
 
     public WorkspaceApiController(
@@ -81,6 +83,7 @@ public class WorkspaceApiController {
             PhaseJoint phase,
             FrameFields fields,
             CloneScan clones,
+            PrefixGroup prefixes,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -100,6 +103,7 @@ public class WorkspaceApiController {
         this.phase = phase;
         this.fields = fields;
         this.clones = clones;
+        this.prefixes = prefixes;
         this.logAnalysis = logAnalysis;
     }
 
@@ -585,6 +589,36 @@ public class WorkspaceApiController {
                                 rec.put("firstOffset", hit.firstOffset());
                                 rec.put("count", hit.count());
                                 rec.put("preview", hit.preview());
+                                return rec;
+                            })
+                            .toList());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/prefix")
+    public Mono<Map<String, Object>> groupPrefixes(
+            @RequestParam("text") String text,
+            @RequestParam(name = "wrap", defaultValue = "70") int wrapWidth,
+            @RequestParam(name = "prefix", defaultValue = "8") int prefixLength) {
+        return Mono.fromCallable(() -> {
+                    var scan = prefixes.group(text, wrapWidth, prefixLength);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("wrapWidth", scan.wrapWidth());
+                    body.put("prefixLength", scan.prefixLength());
+                    body.put("scanned", scan.scanned());
+                    body.put("distinct", scan.distinct());
+                    body.put("familyCount", scan.familyCount());
+                    body.put("familyFrames", scan.familyFrames());
+                    body.put("topCount", scan.topCount());
+                    body.put("topPrefix", scan.topPrefix());
+                    body.put("hits", scan.hits().stream()
+                            .map(hit -> {
+                                Map<String, Object> rec = new LinkedHashMap<>();
+                                rec.put("firstOffset", hit.firstOffset());
+                                rec.put("count", hit.count());
+                                rec.put("prefix", hit.prefix());
                                 return rec;
                             })
                             .toList());

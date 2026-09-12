@@ -24,6 +24,7 @@ import org.webjcvi.seam.SeamGuard;
 import org.webjcvi.phase.PhaseJoint;
 import org.webjcvi.frame.FrameFields;
 import org.webjcvi.clone.CloneScan;
+import org.webjcvi.prefix.PrefixGroup;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -122,6 +123,11 @@ public class WebJcviConfiguration {
     @Bean
     CloneScan cloneScan() {
         return new CloneScan();
+    }
+
+    @Bean
+    PrefixGroup prefixGroup() {
+        return new PrefixGroup();
     }
 
     @Bean

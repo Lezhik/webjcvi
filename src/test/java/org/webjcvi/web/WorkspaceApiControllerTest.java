@@ -131,6 +131,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/phase");
                     assertThat(html).contains("/fields");
                     assertThat(html).contains("/clones");
+                    assertThat(html).contains("/prefix");
                 });
     }
 
@@ -800,6 +801,51 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void prefixApiGroupsSharedHeaders() {
+        String a = "HEADHEAD" + "A".repeat(62);
+        String b = "HEADHEAD" + "B".repeat(62);
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/prefix")
+                        .queryParam("text", a + b)
+                        .queryParam("wrap", "70")
+                        .queryParam("prefix", "8")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.familyCount").isEqualTo(1)
+                .jsonPath("$.familyFrames").isEqualTo(2)
+                .jsonPath("$.topPrefix").isEqualTo("HEADHEAD");
+    }
+
+    @Test
+    void prefixPageRenders() {
+        webTestClient.get()
+                .uri("/prefix")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Prefix families"));
+    }
+
+    @Test
+    void prefixPageFormGroupsSharedHeaders() {
+        String a = "HEADHEAD" + "A".repeat(62);
+        String b = "HEADHEAD" + "B".repeat(62);
+        webTestClient.post()
+                .uri("/prefix")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=" + a + b + "&wrap=70&prefix=8")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("familyCount=1");
+                    assertThat(html).contains("HEADHEAD");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -825,6 +871,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.seams.hitCount").isNumber()
                 .jsonPath("$.phase.hitCount").isNumber()
                 .jsonPath("$.fields.recordCount").isNumber()
-                .jsonPath("$.clones.cloneGroups").isNumber();
+                .jsonPath("$.clones.cloneGroups").isNumber()
+                .jsonPath("$.prefixes.familyCount").isNumber();
     }
 }

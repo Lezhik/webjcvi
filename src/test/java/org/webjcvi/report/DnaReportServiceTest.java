@@ -43,12 +43,12 @@ class DnaReportServiceTest {
         assertThat(report.sequence().normalized()).isEqualTo("ATGCATGN");
         assertThat(report.markdown()).contains("WebJCVI DNA Report");
         assertThat(report.markdown()).contains("src/main/java/org/webjcvi/Example.java");
-        assertThat(report.markdown()).contains("Frame clones");
+        assertThat(report.markdown()).contains("Prefix families");
         assertThat(report.markdown()).contains("Frame remainder");
         assertThat(report.sections()).containsKeys(
                 "length", "gcPercent", "javaSourceCount",
-                "wrapModalWidth", "cloneFrames", "cloneDistinct", "cloneGroups",
-                "cloneTopCount", "uniqueShare");
+                "wrapModalWidth", "prefixDistinct", "prefixFamilies", "prefixFamilyFrames",
+                "prefixTopCount", "prefixUniqueShare");
         assertThat(report.sequence().ambiguousTotal()).isEqualTo(1);
     }
 

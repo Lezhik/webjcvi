@@ -49,6 +49,7 @@
         <p><a href="/phase">Phase joints</a> (reverse field at wrap-frame column 19).</p>
         <p><a href="/fields">Frame fields</a> (extract RC/reverse/identity slots from 70-wide records).</p>
         <p><a href="/clones">Clone frames</a> (find duplicate 70-wide wrap records).</p>
+        <p><a href="/prefix">Prefix families</a> (group records by a shared leading 8-mer).</p>
         <form method="post" action="/report/regenerate">
             <button type="submit">Regenerate report</button>
         </form>

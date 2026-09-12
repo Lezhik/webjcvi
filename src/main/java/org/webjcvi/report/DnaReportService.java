@@ -31,6 +31,7 @@ import org.webjcvi.dna.ReversePhaseCensus;
 import org.webjcvi.dna.MapPhaseCensus;
 import org.webjcvi.dna.SlotCensus;
 import org.webjcvi.dna.CloneCensus;
+import org.webjcvi.dna.PrefixCensus;
 import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.storage.StorageNotFoundException;
 import org.slf4j.Logger;
@@ -123,10 +124,11 @@ public final class DnaReportService {
         MapPhaseCensus mapPhases = MapPhaseCensus.from(sequence, wraps.modalWidth());
         SlotCensus slots = SlotCensus.from(sequence, wraps.modalWidth());
         CloneCensus cloneCensus = CloneCensus.from(sequence, wraps.modalWidth());
+        PrefixCensus prefixCensus = PrefixCensus.from(sequence, wraps.modalWidth());
         Map<String, String> sections = buildSections(
-                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus);
+                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus);
         String markdown = renderMarkdown(
-                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus);
+                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus);
         storage.writeText(reportRelativePath(), markdown);
         if (log.isDebugEnabled()) {
             log.debug("dna-report.regenerate.done bases={} markdownChars={} path={}",
@@ -190,7 +192,8 @@ public final class DnaReportService {
             ReversePhaseCensus phases,
             MapPhaseCensus mapPhases,
             SlotCensus slots,
-            CloneCensus cloneCensus) {
+            CloneCensus cloneCensus,
+            PrefixCensus prefixCensus) {
         Map<String, String> sections = new LinkedHashMap<>();
         sections.put("meta", "generatedAt=" + ISO.format(generatedAt));
         sections.put("length", Integer.toString(sequence.length()));
@@ -199,11 +202,11 @@ public final class DnaReportService {
         sections.put("invalidTotal", Long.toString(sequence.invalidTotal()));
         sections.put("javaSourceCount", Integer.toString(javaSources.size()));
         sections.put("wrapModalWidth", Integer.toString(wraps.modalWidth()));
-        sections.put("cloneFrames", Integer.toString(cloneCensus.frames()));
-        sections.put("cloneDistinct", Integer.toString(cloneCensus.distinct()));
-        sections.put("cloneGroups", Integer.toString(cloneCensus.cloneGroups()));
-        sections.put("cloneTopCount", Integer.toString(cloneCensus.topCount()));
-        sections.put("uniqueShare", String.format(Locale.ROOT, "%.4f", cloneCensus.uniqueShare()));
+        sections.put("prefixDistinct", Integer.toString(prefixCensus.distinct()));
+        sections.put("prefixFamilies", Integer.toString(prefixCensus.familyCount()));
+        sections.put("prefixFamilyFrames", Integer.toString(prefixCensus.familyFrames()));
+        sections.put("prefixTopCount", Integer.toString(prefixCensus.topCount()));
+        sections.put("prefixUniqueShare", String.format(Locale.ROOT, "%.4f", prefixCensus.uniqueShare()));
         sections.put("longestHomopolymer", runs.longestBase() + "x" + runs.longestLength());
         return sections;
     }
@@ -230,15 +233,16 @@ public final class DnaReportService {
             ReversePhaseCensus phases,
             MapPhaseCensus mapPhases,
             SlotCensus slots,
-            CloneCensus cloneCensus) {
+            CloneCensus cloneCensus,
+            PrefixCensus prefixCensus) {
         StringBuilder md = new StringBuilder();
         md.append("# WebJCVI DNA Report\n\n");
         md.append("Generated at **").append(ISO.format(generatedAt.atOffset(ZoneOffset.UTC))).append("**.\n\n");
         md.append("This report is rebuilt from `").append(dnaRelativePath)
-                .append("` and a snapshot of the current codebase. Version 17 of the builder ")
-                .append("counts duplicate wrap-frames of width 70. v16 showed the three peak ")
-                .append("columns share global AT background; this asks whether the *whole* ")
-                .append("record is unique (an identifier) or also collides like TTTTAAAA.\n\n");
+                .append("` and a snapshot of the current codebase. Version 18 of the builder ")
+                .append("groups wrap-frames by a leading 8-mer. v17 showed every 70-mer is ")
+                .append("unique; this asks whether a shared header remains while the remainder ")
+                .append("stays unique (header-plus-body records).\n\n");
 
         md.append("## Sequence composition\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
@@ -279,25 +283,31 @@ public final class DnaReportService {
         md.append("First ").append(PREVIEW_BASES).append(" normalized bases:\n\n```\n");
         md.append(sequence.preview(PREVIEW_BASES)).append("\n```\n\n");
 
-        md.append("## Frame clones\n\n");
-        md.append("Non-overlapping wrap frames of width **").append(cloneCensus.wrapWidth())
-                .append("**. Distinct 70-mers versus frames that occur at least twice. ")
-                .append("If unique share is near 1.0, the wrap record is an identifier; ")
-                .append("if clone groups appear, whole-frame collisions are the protocol.\n\n");
+        md.append("## Prefix families\n\n");
+        md.append("Non-overlapping wrap frames of width **").append(prefixCensus.wrapWidth())
+                .append("**, grouped by the leading **").append(prefixCensus.prefixLength())
+                .append("** bases (the slot width that still collided as TTTTAAAA). ")
+                .append("If prefix unique share is far below whole-frame unique share, ")
+                .append("records share a header; if prefixes are also unique, there is no family.\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
-        md.append("| Frames | ").append(cloneCensus.frames()).append(" |\n");
-        md.append("| Distinct | ").append(cloneCensus.distinct()).append(" |\n");
+        md.append("| Frames | ").append(prefixCensus.frames()).append(" |\n");
+        md.append("| Distinct prefixes | ").append(prefixCensus.distinct()).append(" |\n");
         md.append("| Unique share | ")
-                .append(String.format(Locale.ROOT, "%.4f", cloneCensus.uniqueShare())).append(" |\n");
-        md.append("| Clone groups | ").append(cloneCensus.cloneGroups()).append(" |\n");
-        md.append("| Clone frames | ").append(cloneCensus.cloneFrames()).append(" |\n");
-        md.append("| Top count | ").append(cloneCensus.topCount()).append(" |\n");
-        md.append("| Top preview | `").append(cloneCensus.topFramePreview().isEmpty() ? "-" : cloneCensus.topFramePreview())
+                .append(String.format(Locale.ROOT, "%.4f", prefixCensus.uniqueShare())).append(" |\n");
+        md.append("| Families (count ≥ 2) | ").append(prefixCensus.familyCount()).append(" |\n");
+        md.append("| Family frames | ").append(prefixCensus.familyFrames()).append(" |\n");
+        md.append("| Top count | ").append(prefixCensus.topCount()).append(" |\n");
+        md.append("| Top prefix | `").append(prefixCensus.topPrefix().isEmpty() ? "-" : prefixCensus.topPrefix())
                 .append("` |\n\n");
-        md.append("`").append(cloneCensus.toTextRow()).append("`\n\n");
+        md.append("`").append(prefixCensus.toTextRow()).append("`\n\n");
 
         md.append("## Frame remainder\n\n");
-        md.append("Slot remainder: RC GC **")
+        md.append("Clone remainder: **").append(cloneCensus.distinct())
+                .append("** distinct of **").append(cloneCensus.frames())
+                .append("** (unique share **")
+                .append(String.format(Locale.ROOT, "%.4f", cloneCensus.uniqueShare()))
+                .append("**), clone groups **").append(cloneCensus.cloneGroups())
+                .append("**. Slot remainder: RC GC **")
                 .append(String.format(Locale.ROOT, "%.2f", slots.rc().gcPercent()))
                 .append("%** top `").append(slots.rc().topKmer())
                 .append("`; reverse GC **")
@@ -353,7 +363,7 @@ public final class DnaReportService {
                 .append("**.\n\n");
 
         md.append("## Extracted tape rules\n\n");
-        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus);
+        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus);
 
         md.append("## Codebase snapshot\n\n");
         md.append(javaSources.size()).append(" Java source files under `src/main/java`:\n\n");
@@ -368,14 +378,15 @@ public final class DnaReportService {
 
         md.append("## Growth notes for the next iteration\n\n");
         md.append("- Dominant canonical base: **").append(dominantBase(sequence)).append("**.\n");
-        md.append("- Frame clones: **").append(cloneCensus.distinct())
-                .append("** distinct of **").append(cloneCensus.frames())
+        md.append("- Prefix families: **").append(prefixCensus.distinct())
+                .append("** distinct prefixes of **").append(prefixCensus.frames())
                 .append("** (unique share **")
-                .append(String.format(Locale.ROOT, "%.4f", cloneCensus.uniqueShare()))
-                .append("**); clone groups **").append(cloneCensus.cloneGroups())
-                .append("**, top count **").append(cloneCensus.topCount())
-                .append("**. If unique share is near 1, the wrap record is an identifier; ")
-                .append("if groups appear, whole-frame collisions are the protocol.\n");
+                .append(String.format(Locale.ROOT, "%.4f", prefixCensus.uniqueShare()))
+                .append("**); families **").append(prefixCensus.familyCount())
+                .append("**, top `").append(prefixCensus.topPrefix())
+                .append("` × **").append(prefixCensus.topCount())
+                .append("**. If prefix unique share is below whole-frame unique share, ")
+                .append("records share a header; if both are 1.0, there is no family.\n");
         md.append("- Reverse-only remainder: wrap/mean **")
                 .append(String.format(Locale.ROOT, "%.3f", phases.wrapVsMean()))
                 .append("**.\n");
@@ -410,18 +421,27 @@ public final class DnaReportService {
             ReversePhaseCensus phases,
             MapPhaseCensus mapPhases,
             SlotCensus slots,
-            CloneCensus cloneCensus) {
+            CloneCensus cloneCensus,
+            PrefixCensus prefixCensus) {
         long a = sequence.canonicalCounts().getOrDefault('A', 0L);
         long t = sequence.canonicalCounts().getOrDefault('T', 0L);
-        md.append("1. **R1 Frame clones.** Frames ").append(cloneCensus.frames())
+        md.append("1. **R1 Prefix families.** Frames ").append(prefixCensus.frames())
+                .append(" distinct prefixes ").append(prefixCensus.distinct())
+                .append(" unique share ")
+                .append(String.format(Locale.ROOT, "%.4f", prefixCensus.uniqueShare()))
+                .append("; families ").append(prefixCensus.familyCount())
+                .append(" family frames ").append(prefixCensus.familyFrames())
+                .append(" top ").append(prefixCensus.topPrefix())
+                .append("×").append(prefixCensus.topCount())
+                .append(".\n");
+        md.append("2. **R2 Clone remainder.** Frames ").append(cloneCensus.frames())
                 .append(" distinct ").append(cloneCensus.distinct())
                 .append(" unique share ")
                 .append(String.format(Locale.ROOT, "%.4f", cloneCensus.uniqueShare()))
                 .append("; clone groups ").append(cloneCensus.cloneGroups())
                 .append(" clone frames ").append(cloneCensus.cloneFrames())
                 .append(" top count ").append(cloneCensus.topCount())
-                .append(".\n");
-        md.append("2. **R2 Slot remainder.** RC col ").append(SlotCensus.RC_COLUMN)
+                .append(". RC col ").append(SlotCensus.RC_COLUMN)
                 .append(" GC ")
                 .append(String.format(Locale.ROOT, "%.2f", slots.rc().gcPercent()))
                 .append("% top ").append(slots.rc().topKmer())

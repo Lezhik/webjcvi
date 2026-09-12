@@ -41,6 +41,8 @@ import org.webjcvi.frame.FrameException;
 import org.webjcvi.frame.FrameFields;
 import org.webjcvi.clone.CloneException;
 import org.webjcvi.clone.CloneScan;
+import org.webjcvi.prefix.PrefixException;
+import org.webjcvi.prefix.PrefixGroup;
 import org.webjcvi.logs.LogAnalysisService;
 
 /**
@@ -69,6 +71,7 @@ public class WebJcviMcpTools {
     private final PhaseJoint phase;
     private final FrameFields fields;
     private final CloneScan clones;
+    private final PrefixGroup prefixes;
     private final LogAnalysisService logAnalysis;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
@@ -76,7 +79,7 @@ public class WebJcviMcpTools {
                 new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer(), new KmerStamp(),
                 new PalindromeScan(), new StemLoop(), new FuzzyFind(), new BlockContrast(),
                 new MirrorJoint(), new SeamGuard(), new PhaseJoint(), new FrameFields(),
-                new CloneScan(), new LogAnalysisService());
+                new CloneScan(), new PrefixGroup(), new LogAnalysisService());
     }
 
     @Autowired
@@ -99,6 +102,7 @@ public class WebJcviMcpTools {
             PhaseJoint phase,
             FrameFields fields,
             CloneScan clones,
+            PrefixGroup prefixes,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -118,6 +122,7 @@ public class WebJcviMcpTools {
         this.phase = phase;
         this.fields = fields;
         this.clones = clones;
+        this.prefixes = prefixes;
         this.logAnalysis = logAnalysis;
     }
 
@@ -545,6 +550,30 @@ public class WebJcviMcpTools {
         });
     }
 
+    @Tool(name = "group_prefixes", description = "Group wrap-frame records of caller-supplied text by a shared leading prefix. Default wrap 70, prefix 8. Newlines are dropped. Not the DNA file and not a project path.")
+    public String groupPrefixes(
+            @ToolParam(description = "Arbitrary text to scan") String text,
+            @ToolParam(description = "Wrap frame width; use 70 unless you need a different floor") int wrapWidth,
+            @ToolParam(description = "Prefix length; use 8 unless you need a different floor") int prefixLength) {
+        return run(() -> {
+            int wrap = wrapWidth < 8 ? PrefixGroup.DEFAULT_WRAP : wrapWidth;
+            int prefix = prefixLength < 1 ? PrefixGroup.DEFAULT_PREFIX : prefixLength;
+            var scan = prefixes.group(text, wrap, prefix);
+            StringBuilder out = new StringBuilder(scan.summary()).append('\n');
+            if (scan.hits().isEmpty()) {
+                out.append("(no prefix families)");
+                return out.toString();
+            }
+            for (var hit : scan.hits()) {
+                out.append("count ").append(hit.count())
+                        .append(" firstOffset ").append(hit.firstOffset())
+                        .append(" prefix ").append(hit.prefix())
+                        .append('\n');
+            }
+            return out.toString();
+        });
+    }
+
     @Tool(name = "analyze_logs", description = "Analyze caller-supplied log text with the shared log-analysis facade. Returns a JSON report. Not the DNA file. Truncates at 524288 characters.")
     public String analyzeLogs(
             @ToolParam(description = "Log text to analyze") String text) {
@@ -576,7 +605,7 @@ public class WebJcviMcpTools {
             return action.execute();
         } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException
                  | RareException | TokenException | StampException | FoldException | LoopException
-                 | FuzzyException | ContrastException | MirrorException | SeamException | PhaseException | FrameException | CloneException e) {
+                 | FuzzyException | ContrastException | MirrorException | SeamException | PhaseException | FrameException | CloneException | PrefixException e) {
             return "Error: " + e.getMessage();
         }
     }

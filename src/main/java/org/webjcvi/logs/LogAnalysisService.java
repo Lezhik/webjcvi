@@ -21,6 +21,7 @@ import org.webjcvi.seam.SeamGuard;
 import org.webjcvi.phase.PhaseJoint;
 import org.webjcvi.frame.FrameFields;
 import org.webjcvi.clone.CloneScan;
+import org.webjcvi.prefix.PrefixGroup;
 
 /**
  * Fixed-API facade over the text-processing algorithms for log analysis.
@@ -53,12 +54,13 @@ public final class LogAnalysisService {
     private final PhaseJoint phase;
     private final FrameFields fields;
     private final CloneScan clones;
+    private final PrefixGroup prefixes;
 
     public LogAnalysisService() {
         this(new BannerSplitter(), new PairDrift(), new WrapReflow(), new RareClassScanner(),
                 new RareBreakTokenizer(), new KmerStamp(), new PalindromeScan(), new StemLoop(),
                 new FuzzyFind(), new BlockContrast(), new MirrorJoint(), new SeamGuard(),
-                new PhaseJoint(), new FrameFields(), new CloneScan());
+                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup());
     }
 
     public LogAnalysisService(
@@ -76,7 +78,8 @@ public final class LogAnalysisService {
             SeamGuard seams,
             PhaseJoint phase,
             FrameFields fields,
-            CloneScan clones) {
+            CloneScan clones,
+            PrefixGroup prefixes) {
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
@@ -92,6 +95,7 @@ public final class LogAnalysisService {
         this.phase = phase;
         this.fields = fields;
         this.clones = clones;
+        this.prefixes = prefixes;
     }
 
     /**
@@ -227,6 +231,17 @@ public final class LogAnalysisService {
                 cloneScan.topCount(),
                 cloneScan.wrapWidth());
 
+        var prefixScan = prefixes.group(payload);
+        var prefixSection = new LogAnalysisReport.PrefixSection(
+                prefixScan.scanned(),
+                prefixScan.distinct(),
+                prefixScan.familyCount(),
+                prefixScan.familyFrames(),
+                prefixScan.topCount(),
+                prefixScan.topPrefix(),
+                prefixScan.wrapWidth(),
+                prefixScan.prefixLength());
+
         LogAnalysisReport report = new LogAnalysisReport(
                 API_VERSION,
                 inputLength,
@@ -246,9 +261,10 @@ public final class LogAnalysisService {
                 seamSection,
                 phaseSection,
                 fieldSection,
-                cloneSection);
+                cloneSection,
+                prefixSection);
         if (log.isDebugEnabled()) {
-            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={}",
+            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={}",
                     truncated,
                     tapeSection.runCount(),
                     bannerSection.sectionCount(),
@@ -263,7 +279,8 @@ public final class LogAnalysisService {
                     seamSection.hitCount(),
                     phaseSection.hitCount(),
                     fieldSection.recordCount(),
-                    cloneSection.cloneGroups());
+                    cloneSection.cloneGroups(),
+                    prefixSection.familyCount());
         }
         return report;
     }

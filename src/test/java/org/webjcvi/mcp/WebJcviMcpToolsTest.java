@@ -54,6 +54,7 @@ class WebJcviMcpToolsTest {
                         "phase_mirrors",
                         "extract_fields",
                         "find_clones",
+                        "group_prefixes",
                         "analyze_logs",
                         "list_files",
                         "read_file");
@@ -103,7 +104,7 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Frame clones");
+        assertThat(markdown).contains("Prefix families");
         assertThat(markdown).contains("Frame remainder");
     }
 
@@ -271,6 +272,18 @@ class WebJcviMcpToolsTest {
         assertThat(result).contains("cloneFrames=2");
         assertThat(result).doesNotContain("hidden");
         assertThat(tools.readFile("secret.txt")).isEqualTo("CLONEFRAME-hidden");
+    }
+
+    @Test
+    void groupPrefixesDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "HEADHEAD-hidden");
+        String a = "HEADHEAD" + "A".repeat(62);
+        String b = "HEADHEAD" + "B".repeat(62);
+        String result = tools.groupPrefixes(a + b, 70, 8);
+        assertThat(result).contains("familyCount=1");
+        assertThat(result).contains("prefix HEADHEAD");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("HEADHEAD-hidden");
     }
 
     @Test
