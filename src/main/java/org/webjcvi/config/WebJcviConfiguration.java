@@ -21,6 +21,7 @@ import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.contrast.BlockContrast;
 import org.webjcvi.mirror.MirrorJoint;
 import org.webjcvi.seam.SeamGuard;
+import org.webjcvi.phase.PhaseJoint;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -104,6 +105,11 @@ public class WebJcviConfiguration {
     @Bean
     SeamGuard seamGuard() {
         return new SeamGuard();
+    }
+
+    @Bean
+    PhaseJoint phaseJoint() {
+        return new PhaseJoint();
     }
 
     @Bean

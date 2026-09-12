@@ -51,6 +51,7 @@ class WebJcviMcpToolsTest {
                         "block_contrast",
                         "find_mirrors",
                         "flag_seams",
+                        "phase_mirrors",
                         "analyze_logs",
                         "list_files",
                         "read_file");
@@ -100,7 +101,7 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Reverse phase");
+        assertThat(markdown).contains("Map phase");
         assertThat(markdown).contains("Frame remainder");
     }
 
@@ -229,6 +230,17 @@ class WebJcviMcpToolsTest {
         assertThat(result).contains("ABCD | DCBA");
         assertThat(result).doesNotContain("hidden");
         assertThat(tools.readFile("secret.txt")).isEqualTo("ABCD-hidden");
+    }
+
+    @Test
+    void phaseMirrorsDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "abcddcba-hidden");
+        String text = "x".repeat(19) + "abcddcba";
+        String result = tools.phaseMirrors(text, 70, 19, 4);
+        assertThat(result).contains("hits=1");
+        assertThat(result).contains("ABCD | DCBA");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("abcddcba-hidden");
     }
 
     @Test

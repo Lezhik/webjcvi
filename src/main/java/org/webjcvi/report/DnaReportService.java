@@ -28,6 +28,7 @@ import org.webjcvi.dna.WrapCensus;
 import org.webjcvi.dna.WrapJointCensus;
 import org.webjcvi.dna.WrapReverseCensus;
 import org.webjcvi.dna.ReversePhaseCensus;
+import org.webjcvi.dna.MapPhaseCensus;
 import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.storage.StorageNotFoundException;
 import org.slf4j.Logger;
@@ -117,10 +118,11 @@ public final class DnaReportService {
         NeighborCensus neighbors = NeighborCensus.from(sequence);
         WrapReverseCensus wrapReverse = WrapReverseCensus.from(raw, neighbors);
         ReversePhaseCensus phases = ReversePhaseCensus.from(sequence, wraps.modalWidth());
+        MapPhaseCensus mapPhases = MapPhaseCensus.from(sequence, wraps.modalWidth());
         Map<String, String> sections = buildSections(
-                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases);
+                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases);
         String markdown = renderMarkdown(
-                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases);
+                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases);
         storage.writeText(reportRelativePath(), markdown);
         if (log.isDebugEnabled()) {
             log.debug("dna-report.regenerate.done bases={} markdownChars={} path={}",
@@ -181,7 +183,8 @@ public final class DnaReportService {
             MismatchCensus mismatches,
             NeighborCensus neighbors,
             WrapReverseCensus wrapReverse,
-            ReversePhaseCensus phases) {
+            ReversePhaseCensus phases,
+            MapPhaseCensus mapPhases) {
         Map<String, String> sections = new LinkedHashMap<>();
         sections.put("meta", "generatedAt=" + ISO.format(generatedAt));
         sections.put("length", Integer.toString(sequence.length()));
@@ -190,10 +193,10 @@ public final class DnaReportService {
         sections.put("invalidTotal", Long.toString(sequence.invalidTotal()));
         sections.put("javaSourceCount", Integer.toString(javaSources.size()));
         sections.put("wrapModalWidth", Integer.toString(wraps.modalWidth()));
-        sections.put("peakPhase", Integer.toString(phases.peakPhase()));
-        sections.put("peakReverseShare", String.format(Locale.ROOT, "%.4f", phases.peakShare()));
-        sections.put("wrapPhaseShare", String.format(Locale.ROOT, "%.4f", phases.wrapPhaseShare()));
-        sections.put("wrapVsMean", String.format(Locale.ROOT, "%.3f", phases.wrapVsMean()));
+        sections.put("identityPeakPhase", Integer.toString(mapPhases.identity().peakPhase()));
+        sections.put("reversePeakPhase", Integer.toString(mapPhases.reverse().peakPhase()));
+        sections.put("rcPeakPhase", Integer.toString(mapPhases.rc().peakPhase()));
+        sections.put("reversePeakShare", String.format(Locale.ROOT, "%.4f", mapPhases.reverse().peakShare()));
         sections.put("longestHomopolymer", runs.longestBase() + "x" + runs.longestLength());
         return sections;
     }
@@ -217,16 +220,17 @@ public final class DnaReportService {
             MismatchCensus mismatches,
             NeighborCensus neighbors,
             WrapReverseCensus wrapReverse,
-            ReversePhaseCensus phases) {
+            ReversePhaseCensus phases,
+            MapPhaseCensus mapPhases) {
         StringBuilder md = new StringBuilder();
         md.append("# WebJCVI DNA Report\n\n");
         md.append("Generated at **").append(ISO.format(generatedAt.atOffset(ZoneOffset.UTC))).append("**.\n\n");
         md.append("This report is rebuilt from `").append(dnaRelativePath)
-                .append("` and a snapshot of the current codebase. Version 14 of the builder ")
-                .append("measures reverse-0 share of adjacent 4-mers by offset modulo wrap width. ")
-                .append("v13 wrap joints were slightly depleted vs the linear interior (0.913); ")
-                .append("this asks which column of the wrap frame actually holds the reverse ")
-                .append("enrichment — the wrap column (width−4) or some other phase.\n\n");
+                .append("` and a snapshot of the current codebase. Version 15 of the builder ")
+                .append("finds the wrap-frame phase where identity, reverse, and RC distance-0 ")
+                .append("each peak. v14 reverse peaked at column 19; this asks whether that ")
+                .append("column is reverse-specific or the same phase wins for every neighbor ")
+                .append("map (a compositional artifact).\n\n");
 
         md.append("## Sequence composition\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
@@ -267,35 +271,40 @@ public final class DnaReportService {
         md.append("First ").append(PREVIEW_BASES).append(" normalized bases:\n\n```\n");
         md.append(sequence.preview(PREVIEW_BASES)).append("\n```\n\n");
 
-        md.append("## Reverse phase\n\n");
-        md.append("Overlapping adjacent 4-mers on the linear tape, binned by start offset ")
-                .append("modulo wrap width **").append(phases.wrapWidth())
-                .append("**. The wrap column is phase **").append(phases.wrapPhase())
-                .append("** (last 4 of a full frame). If wrap/mean ≪ 1, reverse enrichment ")
-                .append("avoids the display seam; if a different phase peaks, reverse is a ")
-                .append("periodic protocol inside the frame.\n\n");
-        md.append("| Metric | Value |\n| --- | --- |\n");
-        md.append("| Windows | ").append(phases.windows()).append(" |\n");
-        md.append("| Reverse-0 | ").append(phases.reverseZero()).append(" |\n");
-        md.append("| Mean reverse-0 share | ")
-                .append(String.format(Locale.ROOT, "%.4f", phases.meanShare())).append(" |\n");
-        md.append("| Peak phase | ").append(phases.peakPhase()).append(" |\n");
-        md.append("| Peak reverse-0 share | ")
-                .append(String.format(Locale.ROOT, "%.4f", phases.peakShare())).append(" |\n");
-        md.append("| Wrap-phase reverse-0 share | ")
-                .append(String.format(Locale.ROOT, "%.4f", phases.wrapPhaseShare())).append(" |\n");
-        md.append("| Wrap / mean | ")
-                .append(String.format(Locale.ROOT, "%.3f", phases.wrapVsMean())).append(" |\n\n");
-        md.append("`").append(phases.toTextRow()).append("`\n\n");
+        md.append("## Map phase\n\n");
+        md.append("Overlapping adjacent 4-mers binned by start offset modulo wrap width **")
+                .append(mapPhases.wrapWidth())
+                .append("**. Each neighbor map reports the phase with the highest distance-0 ")
+                .append("share. If reverse's peak phase differs from identity and RC, column ")
+                .append(mapPhases.reverse().peakPhase())
+                .append(" is a reverse field; if all three share a phase, it is composition.\n\n");
+        md.append("| Map | Peak phase | Peak distance-0 share | Peak count |\n");
+        md.append("| --- | --- | --- | --- |\n");
+        for (var row : mapPhases.maps()) {
+            md.append("| ").append(row.mode()).append(" | ")
+                    .append(row.peakPhase()).append(" | ")
+                    .append(String.format(Locale.ROOT, "%.4f", row.peakShare())).append(" | ")
+                    .append(row.peakZero()).append(" |\n");
+        }
+        md.append("\n| Metric | Value |\n| --- | --- |\n");
+        md.append("| Windows | ").append(mapPhases.windows()).append(" |\n");
+        md.append("| Reverse peak phase | ").append(mapPhases.reverse().peakPhase()).append(" |\n");
+        md.append("| Identity peak phase | ").append(mapPhases.identity().peakPhase()).append(" |\n");
+        md.append("| RC peak phase | ").append(mapPhases.rc().peakPhase()).append(" |\n\n");
+        md.append("`").append(mapPhases.toTextRow()).append("`\n\n");
 
         md.append("## Frame remainder\n\n");
-        md.append("Wrap vs interior reverse: wrap share **")
-                .append(String.format(Locale.ROOT, "%.4f", wrapReverse.wrapReverseShare()))
-                .append("** vs interior **")
-                .append(String.format(Locale.ROOT, "%.4f", wrapReverse.interiorReverseShare()))
-                .append("** (wrap/interior **")
+        md.append("Reverse-only phase: peak **").append(phases.peakPhase())
+                .append("** share **")
+                .append(String.format(Locale.ROOT, "%.4f", phases.peakShare()))
+                .append("**; wrap phase **").append(phases.wrapPhase())
+                .append("** share **")
+                .append(String.format(Locale.ROOT, "%.4f", phases.wrapPhaseShare()))
+                .append("** (wrap/mean **")
+                .append(String.format(Locale.ROOT, "%.3f", phases.wrapVsMean()))
+                .append("**). Wrap vs interior reverse: wrap/interior **")
                 .append(String.format(Locale.ROOT, "%.3f", wrapReverse.wrapVsInterior()))
-                .append("**). Neighbor Hamming: identity zero× **")
+                .append("**. Neighbor Hamming: identity zero× **")
                 .append(String.format(Locale.ROOT, "%.3f", neighbors.identity().zeroEnrichment()))
                 .append("**; reverse × **")
                 .append(String.format(Locale.ROOT, "%.3f", neighbors.reverse().zeroEnrichment()))
@@ -323,7 +332,7 @@ public final class DnaReportService {
                 .append("**.\n\n");
 
         md.append("## Extracted tape rules\n\n");
-        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases);
+        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases);
 
         md.append("## Codebase snapshot\n\n");
         md.append(javaSources.size()).append(" Java source files under `src/main/java`:\n\n");
@@ -338,19 +347,19 @@ public final class DnaReportService {
 
         md.append("## Growth notes for the next iteration\n\n");
         md.append("- Dominant canonical base: **").append(dominantBase(sequence)).append("**.\n");
-        md.append("- Reverse phase: peak phase **").append(phases.peakPhase())
-                .append("** share **")
-                .append(String.format(Locale.ROOT, "%.4f", phases.peakShare()))
-                .append("**; wrap phase **").append(phases.wrapPhase())
-                .append("** share **")
-                .append(String.format(Locale.ROOT, "%.4f", phases.wrapPhaseShare()))
-                .append("** (wrap/mean **")
+        md.append("- Map phase: identity peaks at **").append(mapPhases.identity().peakPhase())
+                .append("** (share **")
+                .append(String.format(Locale.ROOT, "%.4f", mapPhases.identity().peakShare()))
+                .append("**); reverse at **").append(mapPhases.reverse().peakPhase())
+                .append("** (share **")
+                .append(String.format(Locale.ROOT, "%.4f", mapPhases.reverse().peakShare()))
+                .append("**); RC at **").append(mapPhases.rc().peakPhase())
+                .append("** (share **")
+                .append(String.format(Locale.ROOT, "%.4f", mapPhases.rc().peakShare()))
+                .append("**). If reverse's column differs from identity and RC, it is a ")
+                .append("reverse field; if all three agree, the peak is compositional.\n");
+        md.append("- Reverse-only remainder: wrap/mean **")
                 .append(String.format(Locale.ROOT, "%.3f", phases.wrapVsMean()))
-                .append("**). If wrap/mean ≪ 1, reverse avoids the display seam; if the peak ")
-                .append("phase is neither 0 nor the wrap column, reverse is a periodic protocol ")
-                .append("inside the frame.\n");
-        md.append("- Wrap vs interior remainder: wrap/interior **")
-                .append(String.format(Locale.ROOT, "%.3f", wrapReverse.wrapVsInterior()))
                 .append("**.\n");
         md.append("- Homopolymer longest **").append(runs.longestBase()).append(" × ")
                 .append(runs.longestLength()).append("**.\n");
@@ -380,25 +389,28 @@ public final class DnaReportService {
             MismatchCensus mismatches,
             NeighborCensus neighbors,
             WrapReverseCensus wrapReverse,
-            ReversePhaseCensus phases) {
+            ReversePhaseCensus phases,
+            MapPhaseCensus mapPhases) {
         long a = sequence.canonicalCounts().getOrDefault('A', 0L);
         long t = sequence.canonicalCounts().getOrDefault('T', 0L);
-        md.append("1. **R1 Reverse phase.** Peak phase ").append(phases.peakPhase())
+        md.append("1. **R1 Map phase.** Identity peaks at ").append(mapPhases.identity().peakPhase())
+                .append(" share ")
+                .append(String.format(Locale.ROOT, "%.4f", mapPhases.identity().peakShare()))
+                .append("; reverse at ").append(mapPhases.reverse().peakPhase())
+                .append(" share ")
+                .append(String.format(Locale.ROOT, "%.4f", mapPhases.reverse().peakShare()))
+                .append("; RC at ").append(mapPhases.rc().peakPhase())
+                .append(" share ")
+                .append(String.format(Locale.ROOT, "%.4f", mapPhases.rc().peakShare()))
+                .append(".\n");
+        md.append("2. **R2 Reverse-phase remainder.** Peak phase ").append(phases.peakPhase())
                 .append(" share ")
                 .append(String.format(Locale.ROOT, "%.4f", phases.peakShare()))
-                .append("; wrap phase ").append(phases.wrapPhase())
-                .append(" share ")
-                .append(String.format(Locale.ROOT, "%.4f", phases.wrapPhaseShare()))
-                .append(" (wrap/mean ")
+                .append("; wrap/mean ")
                 .append(String.format(Locale.ROOT, "%.3f", phases.wrapVsMean()))
-                .append(").\n");
-        md.append("2. **R2 Wrap vs interior remainder.** Wrap reverse-0 share ")
-                .append(String.format(Locale.ROOT, "%.4f", wrapReverse.wrapReverseShare()))
-                .append(" vs interior ")
-                .append(String.format(Locale.ROOT, "%.4f", wrapReverse.interiorReverseShare()))
-                .append(" (wrap/interior ")
+                .append(". Wrap/interior ")
                 .append(String.format(Locale.ROOT, "%.3f", wrapReverse.wrapVsInterior()))
-                .append("). Identity zero×")
+                .append(". Identity zero×")
                 .append(String.format(Locale.ROOT, "%.3f", neighbors.identity().zeroEnrichment()))
                 .append("; reverse ×")
                 .append(String.format(Locale.ROOT, "%.3f", neighbors.reverse().zeroEnrichment()))

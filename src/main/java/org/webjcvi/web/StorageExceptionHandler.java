@@ -22,6 +22,7 @@ import org.webjcvi.fuzzy.FuzzyException;
 import org.webjcvi.contrast.ContrastException;
 import org.webjcvi.mirror.MirrorException;
 import org.webjcvi.seam.SeamException;
+import org.webjcvi.phase.PhaseException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
@@ -102,6 +103,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> seam(SeamException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "seam", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(PhaseException.class)
+    ResponseEntity<Map<String, String>> phase(PhaseException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "phase", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

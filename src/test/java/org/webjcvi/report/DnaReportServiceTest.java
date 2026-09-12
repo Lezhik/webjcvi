@@ -43,11 +43,11 @@ class DnaReportServiceTest {
         assertThat(report.sequence().normalized()).isEqualTo("ATGCATGN");
         assertThat(report.markdown()).contains("WebJCVI DNA Report");
         assertThat(report.markdown()).contains("src/main/java/org/webjcvi/Example.java");
-        assertThat(report.markdown()).contains("Reverse phase");
+        assertThat(report.markdown()).contains("Map phase");
         assertThat(report.markdown()).contains("Frame remainder");
         assertThat(report.sections()).containsKeys(
                 "length", "gcPercent", "javaSourceCount",
-                "wrapModalWidth", "peakPhase", "peakReverseShare", "wrapPhaseShare", "wrapVsMean");
+                "wrapModalWidth", "identityPeakPhase", "reversePeakPhase", "rcPeakPhase", "reversePeakShare");
         assertThat(report.sequence().ambiguousTotal()).isEqualTo(1);
     }
 

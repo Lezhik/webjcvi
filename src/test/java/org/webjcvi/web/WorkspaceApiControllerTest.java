@@ -128,6 +128,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/contrast");
                     assertThat(html).contains("/mirror");
                     assertThat(html).contains("/seam");
+                    assertThat(html).contains("/phase");
                 });
     }
 
@@ -659,6 +660,50 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void phaseApiFlagsColumnReverseJoints() {
+        String text = "x".repeat(19) + "abcddcba";
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/phase")
+                        .queryParam("text", text)
+                        .queryParam("wrap", "70")
+                        .queryParam("phase", "19")
+                        .queryParam("block", "4")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.hitCount").isEqualTo(1)
+                .jsonPath("$.hits[0].left").isEqualTo("ABCD")
+                .jsonPath("$.hits[0].right").isEqualTo("DCBA");
+    }
+
+    @Test
+    void phasePageRenders() {
+        webTestClient.get()
+                .uri("/phase")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Phase joints"));
+    }
+
+    @Test
+    void phasePageFormFlagsColumnReverseJoints() {
+        String text = "x".repeat(19) + "abcddcba";
+        webTestClient.post()
+                .uri("/phase")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=" + text + "&wrap=70&phase=19&block=4")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("ABCD");
+                    assertThat(html).contains("DCBA");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -681,6 +726,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.fuzzy.skipped").isBoolean()
                 .jsonPath("$.contrast.stutterCount").isNumber()
                 .jsonPath("$.mirrors.jointCount").isNumber()
-                .jsonPath("$.seams.hitCount").isNumber();
+                .jsonPath("$.seams.hitCount").isNumber()
+                .jsonPath("$.phase.hitCount").isNumber();
     }
 }

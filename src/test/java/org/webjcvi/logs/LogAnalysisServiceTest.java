@@ -30,7 +30,8 @@ class LogAnalysisServiceTest {
             "fuzzy",
             "contrast",
             "mirrors",
-            "seams");
+            "seams",
+            "phase");
 
     private static final List<String> TAPE_KEYS = List.of("length", "runCount", "longestRun");
     private static final List<String> BANNER_KEYS = List.of("sectionCount", "minRun");
@@ -48,6 +49,7 @@ class LogAnalysisServiceTest {
             "scanned", "stutterCount", "modalDistance", "meanDistance", "flagMax");
     private static final List<String> MIRROR_KEYS = List.of("scanned", "jointCount", "width");
     private static final List<String> SEAM_KEYS = List.of("scanned", "hitCount", "wrapWidth", "blockWidth");
+    private static final List<String> PHASE_KEYS = List.of("scanned", "hitCount", "wrapWidth", "phase", "blockWidth");
 
     private final LogAnalysisService service = new LogAnalysisService();
     private final ObjectMapper mapper = new ObjectMapper();
@@ -89,6 +91,7 @@ class LogAnalysisServiceTest {
         assertThat(root.get("contrast").fieldNames()).toIterable().containsExactlyElementsOf(CONTRAST_KEYS);
         assertThat(root.get("mirrors").fieldNames()).toIterable().containsExactlyElementsOf(MIRROR_KEYS);
         assertThat(root.get("seams").fieldNames()).toIterable().containsExactlyElementsOf(SEAM_KEYS);
+        assertThat(root.get("phase").fieldNames()).toIterable().containsExactlyElementsOf(PHASE_KEYS);
         assertThat(root.get("tape").get("length").intValue()).isEqualTo(sample.length());
         assertThat(root.get("banners").get("sectionCount").intValue()).isGreaterThanOrEqualTo(1);
         assertThat(root.get("spans").get("spanCount").intValue()).isGreaterThanOrEqualTo(1);

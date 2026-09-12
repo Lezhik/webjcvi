@@ -35,6 +35,8 @@ import org.webjcvi.mirror.MirrorException;
 import org.webjcvi.mirror.MirrorJoint;
 import org.webjcvi.seam.SeamException;
 import org.webjcvi.seam.SeamGuard;
+import org.webjcvi.phase.PhaseException;
+import org.webjcvi.phase.PhaseJoint;
 import org.webjcvi.logs.LogAnalysisService;
 
 /**
@@ -60,13 +62,14 @@ public class WebJcviMcpTools {
     private final BlockContrast contrast;
     private final MirrorJoint mirrors;
     private final SeamGuard seams;
+    private final PhaseJoint phase;
     private final LogAnalysisService logAnalysis;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
         this(storage, reports, new ScratchTape(), new BannerSplitter(), new PairDrift(),
                 new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer(), new KmerStamp(),
                 new PalindromeScan(), new StemLoop(), new FuzzyFind(), new BlockContrast(),
-                new MirrorJoint(), new SeamGuard(), new LogAnalysisService());
+                new MirrorJoint(), new SeamGuard(), new PhaseJoint(), new LogAnalysisService());
     }
 
     @Autowired
@@ -86,6 +89,7 @@ public class WebJcviMcpTools {
             BlockContrast contrast,
             MirrorJoint mirrors,
             SeamGuard seams,
+            PhaseJoint phase,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -102,6 +106,7 @@ public class WebJcviMcpTools {
         this.contrast = contrast;
         this.mirrors = mirrors;
         this.seams = seams;
+        this.phase = phase;
         this.logAnalysis = logAnalysis;
     }
 
@@ -454,6 +459,33 @@ public class WebJcviMcpTools {
         });
     }
 
+    @Tool(name = "phase_mirrors", description = "Find reverse joints at a fixed wrap-frame column in caller-supplied text. Default wrap 70, phase 19, block 4. Newlines are dropped. Not the DNA file and not a project path.")
+    public String phaseMirrors(
+            @ToolParam(description = "Arbitrary text to scan") String text,
+            @ToolParam(description = "Wrap frame width; use 70 unless you need a different floor") int wrapWidth,
+            @ToolParam(description = "Column inside the frame; use 19 unless you need a different floor") int phase,
+            @ToolParam(description = "Block width; use 4 unless you need a different floor") int blockWidth) {
+        return run(() -> {
+            int wrap = wrapWidth < 8 ? PhaseJoint.DEFAULT_WRAP : wrapWidth;
+            int column = phase < 0 ? PhaseJoint.DEFAULT_PHASE : phase;
+            int block = blockWidth < 2 ? PhaseJoint.DEFAULT_BLOCK : blockWidth;
+            var scan = this.phase.scan(text, wrap, column, block);
+            StringBuilder out = new StringBuilder(scan.summary()).append('\n');
+            if (scan.hits().isEmpty()) {
+                out.append("(no phase joints)");
+                return out.toString();
+            }
+            for (var hit : scan.hits()) {
+                out.append("#").append(hit.index())
+                        .append(" offset ").append(hit.offset())
+                        .append(" identity ").append(hit.identityDistance())
+                        .append('\n')
+                        .append(hit.left()).append(" | ").append(hit.right()).append('\n');
+            }
+            return out.toString();
+        });
+    }
+
     @Tool(name = "analyze_logs", description = "Analyze caller-supplied log text with the shared log-analysis facade. Returns a JSON report. Not the DNA file. Truncates at 524288 characters.")
     public String analyzeLogs(
             @ToolParam(description = "Log text to analyze") String text) {
@@ -485,7 +517,7 @@ public class WebJcviMcpTools {
             return action.execute();
         } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException
                  | RareException | TokenException | StampException | FoldException | LoopException
-                 | FuzzyException | ContrastException | MirrorException | SeamException e) {
+                 | FuzzyException | ContrastException | MirrorException | SeamException | PhaseException e) {
             return "Error: " + e.getMessage();
         }
     }
