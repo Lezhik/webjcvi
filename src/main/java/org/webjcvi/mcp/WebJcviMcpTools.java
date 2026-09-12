@@ -13,6 +13,8 @@ import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.storage.StorageException;
 import org.webjcvi.tape.ScratchTape;
 import org.webjcvi.tape.TapeException;
+import org.webjcvi.drift.DriftException;
+import org.webjcvi.drift.PairDrift;
 
 /**
  * MCP tool surface. File tools go through {@link FileStorageService}. The
@@ -26,9 +28,10 @@ public class WebJcviMcpTools {
     private final DnaReportService reports;
     private final ScratchTape tape;
     private final BannerSplitter splitter;
+    private final PairDrift drift;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
-        this(storage, reports, new ScratchTape(), new BannerSplitter());
+        this(storage, reports, new ScratchTape(), new BannerSplitter(), new PairDrift());
     }
 
     @Autowired
@@ -36,11 +39,13 @@ public class WebJcviMcpTools {
             FileStorageService storage,
             DnaReportService reports,
             ScratchTape tape,
-            BannerSplitter splitter) {
+            BannerSplitter splitter,
+            PairDrift drift) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
         this.splitter = splitter;
+        this.drift = drift;
     }
 
     @Tool(name = "regenerate_dna_report", description = "Clear prior reports and rebuild the DNA report from jcvi-dna.txt and the current codebase.")
@@ -129,6 +134,31 @@ public class WebJcviMcpTools {
         });
     }
 
+    @Tool(name = "pair_drift", description = "Scan caller-supplied text in wrap-sized windows (default 70) and list local complementary-bracket hotspots. Not the DNA file and not a project path.")
+    public String pairDrift(
+            @ToolParam(description = "Arbitrary text to scan") String text,
+            @ToolParam(description = "Window width; use 70 unless you need a different frame") int window) {
+        return run(() -> {
+            int width = window < 2 ? PairDrift.DEFAULT_WINDOW : window;
+            var scan = drift.scan(text, width, PairDrift.DEFAULT_THRESHOLD);
+            StringBuilder out = new StringBuilder(scan.summary()).append('\n');
+            if (scan.hotspots().isEmpty()) {
+                out.append("(no hotspots)");
+                return out.toString();
+            }
+            for (var hit : scan.hotspots()) {
+                out.append("#").append(hit.index())
+                        .append(" offset ").append(hit.offset())
+                        .append(" opens ").append(hit.opens())
+                        .append(" closes ").append(hit.closes())
+                        .append(" skew ").append(hit.skewText())
+                        .append('\n')
+                        .append(hit.preview()).append('\n');
+            }
+            return out.toString();
+        });
+    }
+
     @Tool(name = "list_files", description = "List files inside the project directory. Paths must be relative to the project root.")
     public String listFiles(
             @ToolParam(description = "Relative directory to list, or '.' for the project root") String path,
@@ -152,7 +182,7 @@ public class WebJcviMcpTools {
     private static String run(ToolAction action) {
         try {
             return action.execute();
-        } catch (StorageException | TapeException | SegmentException e) {
+        } catch (StorageException | TapeException | SegmentException | DriftException e) {
             return "Error: " + e.getMessage();
         }
     }

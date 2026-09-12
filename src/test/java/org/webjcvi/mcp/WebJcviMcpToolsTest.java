@@ -40,6 +40,7 @@ class WebJcviMcpToolsTest {
                         "tape_find",
                         "tape_runs",
                         "split_banners",
+                        "pair_drift",
                         "list_files",
                         "read_file");
     }
@@ -88,8 +89,8 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Frame-window Chargaff skew");
-        assertThat(markdown).contains("Homopolymer remainder");
+        assertThat(markdown).contains("Skew-island geography");
+        assertThat(markdown).contains("Wrap-joint dinucleotides");
     }
 
     @Test
@@ -109,5 +110,14 @@ class WebJcviMcpToolsTest {
         assertThat(result).contains("tail");
         assertThat(result).doesNotContain("hidden");
         assertThat(tools.readFile("secret.txt")).isEqualTo("==========hidden");
+    }
+
+    @Test
+    void pairDriftDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "((((((((((hidden))))))))))");
+        String result = tools.pairDrift("((((((((((          ))))))))))          ", 20);
+        assertThat(result).contains("hotspots=2");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("((((((((((hidden))))))))))");
     }
 }

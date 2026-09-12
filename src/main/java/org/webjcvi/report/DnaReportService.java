@@ -15,7 +15,9 @@ import org.webjcvi.dna.DnaParser;
 import org.webjcvi.dna.DnaSequence;
 import org.webjcvi.dna.FrameSkewCensus;
 import org.webjcvi.dna.HomopolymerProfile;
+import org.webjcvi.dna.SkewIslandCensus;
 import org.webjcvi.dna.WrapCensus;
+import org.webjcvi.dna.WrapJointCensus;
 import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.storage.StorageNotFoundException;
 
@@ -87,8 +89,12 @@ public final class DnaReportService {
         WrapCensus wraps = WrapCensus.fromRaw(raw);
         HomopolymerProfile runs = HomopolymerProfile.from(sequence);
         FrameSkewCensus skew = FrameSkewCensus.from(sequence, wraps.modalWidth());
-        Map<String, String> sections = buildSections(sequence, generatedAt, javaSources, wraps, runs, skew);
-        String markdown = renderMarkdown(sections, sequence, generatedAt, javaSources, wraps, runs, skew);
+        SkewIslandCensus islands = SkewIslandCensus.from(sequence, wraps.modalWidth());
+        WrapJointCensus joints = WrapJointCensus.fromRaw(raw);
+        Map<String, String> sections = buildSections(
+                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints);
+        String markdown = renderMarkdown(
+                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints);
         storage.writeText(reportRelativePath(), markdown);
         return new DnaReport(generatedAt, sequence, sections, markdown);
     }
@@ -133,7 +139,9 @@ public final class DnaReportService {
             List<String> javaSources,
             WrapCensus wraps,
             HomopolymerProfile runs,
-            FrameSkewCensus skew) {
+            FrameSkewCensus skew,
+            SkewIslandCensus islands,
+            WrapJointCensus joints) {
         Map<String, String> sections = new LinkedHashMap<>();
         sections.put("meta", "generatedAt=" + ISO.format(generatedAt));
         sections.put("length", Integer.toString(sequence.length()));
@@ -142,13 +150,15 @@ public final class DnaReportService {
         sections.put("invalidTotal", Long.toString(sequence.invalidTotal()));
         sections.put("javaSourceCount", Integer.toString(javaSources.size()));
         sections.put("wrapModalWidth", Integer.toString(wraps.modalWidth()));
-        sections.put("skewWindow", Integer.toString(skew.window()));
-        sections.put("skewWindowCount", Integer.toString(skew.windowCount()));
+        sections.put("failIslands", Integer.toString(islands.failIslands()));
+        sections.put("passIslands", Integer.toString(islands.passIslands()));
+        sections.put("longestFailIsland", Integer.toString(islands.longestFail()));
+        sections.put("longestPassIsland", Integer.toString(islands.longestPass()));
+        sections.put("jointCount", Integer.toString(joints.jointCount()));
+        sections.put("complementaryJoints", Integer.toString(joints.complementaryJoints()));
+        sections.put("topWrapJoint", joints.topJoint().isEmpty() ? "-" : joints.topJoint());
         sections.put("meanAbsAtSkew", String.format(Locale.ROOT, "%.4f", skew.meanAbsAtSkew()));
-        sections.put("maxAbsAtSkew", String.format(Locale.ROOT, "%.4f", skew.maxAbsAtSkew()));
-        sections.put("windowsPastAtThreshold", Integer.toString(skew.windowsPastThreshold()));
         sections.put("longestHomopolymer", runs.longestBase() + "x" + runs.longestLength());
-        sections.put("homopolymerRunsAtLeast5", Long.toString(runs.runsAtLeast5()));
         return sections;
     }
 
@@ -159,14 +169,16 @@ public final class DnaReportService {
             List<String> javaSources,
             WrapCensus wraps,
             HomopolymerProfile runs,
-            FrameSkewCensus skew) {
+            FrameSkewCensus skew,
+            SkewIslandCensus islands,
+            WrapJointCensus joints) {
         StringBuilder md = new StringBuilder();
         md.append("# WebJCVI DNA Report\n\n");
         md.append("Generated at **").append(ISO.format(generatedAt.atOffset(ZoneOffset.UTC))).append("**.\n\n");
         md.append("This report is rebuilt from `").append(dnaRelativePath)
-                .append("` and a snapshot of the current codebase. Version 3 of the builder ")
-                .append("walks wrap-sized windows and measures local Chargaff skew — ")
-                .append("global A≈T can hide frame-level imbalance.\n\n");
+                .append("` and a snapshot of the current codebase. Version 4 of the builder ")
+                .append("reads geography and glue: islands of consecutive Chargaff-failing windows, ")
+                .append("and dinucleotides at wrap joints — not a bag of per-window means.\n\n");
 
         md.append("## Sequence composition\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
@@ -207,45 +219,58 @@ public final class DnaReportService {
         md.append("First ").append(PREVIEW_BASES).append(" normalized bases:\n\n```\n");
         md.append(sequence.preview(PREVIEW_BASES)).append("\n```\n\n");
 
-        md.append("## Frame-window Chargaff skew\n\n");
-        md.append("Each window is **").append(skew.window())
-                .append("** bases (the modal wrap width). AT-skew is `(A−T)/(A+T)`; ")
-                .append("GC-skew is `(G−C)/(G+C)`. A window is flagged when `|AT-skew|` exceeds ")
+        md.append("## Skew-island geography\n\n");
+        md.append("Windows of **").append(islands.window())
+                .append("** bases (modal wrap). A window *fails* when `|AT-skew|` exceeds ")
                 .append(String.format(Locale.ROOT, "%.2f", FrameSkewCensus.LOCAL_THRESHOLD))
-                .append(" — larger than the global residual (~0.009).\n\n");
+                .append(". Consecutive failed or passed windows collapse into islands. ")
+                .append("v3 only counted failing windows; this version asks whether they cluster.\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
-        md.append("| Windows | ").append(skew.windowCount()).append(" |\n");
-        md.append("| Mean |AT-skew| | ")
-                .append(String.format(Locale.ROOT, "%.4f", skew.meanAbsAtSkew())).append(" |\n");
-        md.append("| Max |AT-skew| | ")
-                .append(String.format(Locale.ROOT, "%.4f", skew.maxAbsAtSkew())).append(" |\n");
-        md.append("| Windows with |AT-skew| > threshold | ")
-                .append(skew.windowsPastThreshold()).append(" |\n");
-        md.append("| Mean |GC-skew| | ")
-                .append(String.format(Locale.ROOT, "%.4f", skew.meanAbsGcSkew())).append(" |\n");
-        md.append("| Max |GC-skew| | ")
-                .append(String.format(Locale.ROOT, "%.4f", skew.maxAbsGcSkew())).append(" |\n\n");
-        md.append("`").append(skew.toTextRow()).append("`\n\n");
+        md.append("| Windows | ").append(islands.windowCount()).append(" |\n");
+        md.append("| Failed windows | ").append(islands.failWindows()).append(" |\n");
+        md.append("| Fail islands | ").append(islands.failIslands()).append(" |\n");
+        md.append("| Pass islands | ").append(islands.passIslands()).append(" |\n");
+        md.append("| Longest fail island | ").append(islands.longestFail()).append(" windows |\n");
+        md.append("| Longest pass island | ").append(islands.longestPass()).append(" windows |\n\n");
 
-        md.append("## Wrap width (window source)\n\n");
+        md.append("## Wrap-joint dinucleotides\n\n");
+        md.append("Last canonical base of line N glued to the first of line N+1. ")
+                .append("A joint is complementary when it is AT/TA/GC/CG.\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
-        md.append("| Lines | ").append(wraps.lineCount()).append(" |\n");
-        md.append("| Min / median / modal / max | ")
+        md.append("| Joints | ").append(joints.jointCount()).append(" |\n");
+        md.append("| Complementary joints | ").append(joints.complementaryJoints())
+                .append(" (")
+                .append(String.format(Locale.ROOT, "%.1f%%", joints.complementaryShare()))
+                .append(") |\n");
+        md.append("| Top joint | `").append(joints.topJoint().isEmpty() ? "-" : joints.topJoint())
+                .append("` × ").append(joints.topJointCount()).append(" |\n\n");
+        if (!joints.topJoints().isEmpty()) {
+            md.append("| Dimer | Count |\n| --- | --- |\n");
+            joints.topJoints().forEach((dimer, count) ->
+                    md.append("| `").append(dimer).append("` | ").append(count).append(" |\n"));
+            md.append('\n');
+        }
+        md.append("`").append(joints.toTextRow()).append("`\n\n");
+
+        md.append("## Frame remainder\n\n");
+        md.append("v3 aggregate: mean |AT-skew| **")
+                .append(String.format(Locale.ROOT, "%.4f", skew.meanAbsAtSkew()))
+                .append("**, max **")
+                .append(String.format(Locale.ROOT, "%.4f", skew.maxAbsAtSkew()))
+                .append("**. Wrap min/median/modal/max: ")
                 .append(wraps.minWidth()).append(" / ")
                 .append(wraps.medianWidth()).append(" / ")
                 .append(wraps.modalWidth()).append(" / ")
-                .append(wraps.maxWidth()).append(" |\n\n");
-
-        md.append("## Homopolymer remainder\n\n");
-        md.append("Longest **").append(runs.longestBase()).append(" × ").append(runs.longestLength())
-                .append("**; ≥5: ").append(runs.runsAtLeast5())
-                .append("; 5–9 / 10–19 / 20+: ")
+                .append(wraps.maxWidth())
+                .append(". Homopolymer longest **")
+                .append(runs.longestBase()).append(" × ").append(runs.longestLength())
+                .append("**; 5–9 / 10–19 / 20+: ")
                 .append(runs.runs5to9()).append(" / ")
                 .append(runs.runs10to19()).append(" / ")
                 .append(runs.runs20plus()).append(".\n\n");
 
         md.append("## Extracted tape rules\n\n");
-        appendExtractedRules(md, sequence, wraps, runs, skew);
+        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints);
 
         md.append("## Codebase snapshot\n\n");
         md.append(javaSources.size()).append(" Java source files under `src/main/java`:\n\n");
@@ -261,15 +286,20 @@ public final class DnaReportService {
         md.append("## Growth notes for the next iteration\n\n");
         md.append("- Dominant canonical base: **").append(dominantBase(sequence)).append("**.\n");
         md.append("- Wrap modal width **").append(wraps.modalWidth())
-                .append("** used as the skew window. The next builder should look at *what sits at frame boundaries*, not only the inside of each window.\n");
-        md.append("- Local Chargaff: mean |AT-skew| **")
+                .append("**. Joints: **").append(joints.jointCount())
+                .append("**, complementary **")
+                .append(String.format(Locale.ROOT, "%.1f%%", joints.complementaryShare()))
+                .append("**, top `").append(joints.topJoint().isEmpty() ? "-" : joints.topJoint())
+                .append("`. If pairing lives on the glue, the next hypothesis should use the joint table, not only island counts.\n");
+        md.append("- Skew islands: **").append(islands.failIslands())
+                .append("** fail / **").append(islands.passIslands())
+                .append("** pass; longest fail **").append(islands.longestFail())
+                .append("**, longest pass **").append(islands.longestPass())
+                .append("**. If islands are short and many, drift is speckled; if few and long, it is regional.\n");
+        md.append("- Frame remainder mean |AT-skew| **")
                 .append(String.format(Locale.ROOT, "%.4f", skew.meanAbsAtSkew()))
-                .append("**, **").append(skew.windowsPastThreshold())
-                .append("** windows past ").append(FrameSkewCensus.LOCAL_THRESHOLD)
-                .append(". If pairing is a local property, the next hypothesis should use the failing windows, not the global bag.\n");
-        md.append("- Homopolymer remainder: longest **").append(runs.longestBase()).append(" × ")
-                .append(runs.longestLength()).append("**; 10+ runs remain the rare class (")
-                .append(runs.runs10to19()).append(" + ").append(runs.runs20plus()).append(").\n");
+                .append("**. Homopolymer longest **").append(runs.longestBase()).append(" × ")
+                .append(runs.longestLength()).append("**.\n");
         md.append("- Module split (TZ §6.12) is **not** indicated: single Gradle module, no sub-module reports.\n");
 
         md.append("\n## Machine-readable sections\n\n");
@@ -284,30 +314,34 @@ public final class DnaReportService {
             DnaSequence sequence,
             WrapCensus wraps,
             HomopolymerProfile runs,
-            FrameSkewCensus skew) {
+            FrameSkewCensus skew,
+            SkewIslandCensus islands,
+            WrapJointCensus joints) {
         long a = sequence.canonicalCounts().getOrDefault('A', 0L);
         long t = sequence.canonicalCounts().getOrDefault('T', 0L);
-        md.append("1. **R1 Rare long banners.** Homopolymer 10–19 = ")
-                .append(runs.runs10to19())
-                .append(", 20+ = ").append(runs.runs20plus())
-                .append(" versus 5–9 = ").append(runs.runs5to9())
-                .append(". Length ≥ 10 is the separator class; shorter repeats are payload noise.\n");
-        md.append("2. **R2 AT-class delimiters.** Max G-run = ")
-                .append(runs.maxRun().getOrDefault('G', 0L))
-                .append(", max C-run = ")
-                .append(runs.maxRun().getOrDefault('C', 0L))
-                .append("; longest run overall is ")
-                .append(runs.longestBase()).append("×").append(runs.longestLength())
-                .append(". The rare 10+ class, when present, comes from the abundant alphabet.\n");
-        md.append("3. **R3 Frame-local pairing.** Global A=").append(a)
+        md.append("1. **R1 Drift is geographic.** ").append(islands.failWindows())
+                .append(" of ").append(islands.windowCount())
+                .append(" windows fail local Chargaff, but they form **")
+                .append(islands.failIslands()).append("** fail islands (longest ")
+                .append(islands.longestFail()).append(") and **")
+                .append(islands.passIslands()).append("** pass islands (longest ")
+                .append(islands.longestPass()).append(").\n");
+        md.append("2. **R2 Glue is rarely complementary.** Wrap joints = ")
+                .append(joints.jointCount())
+                .append(", complementary = ").append(joints.complementaryJoints())
+                .append(" (")
+                .append(String.format(Locale.ROOT, "%.1f%%", joints.complementaryShare()))
+                .append("), top dimer `")
+                .append(joints.topJoint().isEmpty() ? "-" : joints.topJoint()).append("`.\n");
+        md.append("3. **R3 Global pairing still holds.** A=").append(a)
                 .append(", T=").append(t)
                 .append(" (|A−T|=").append(Math.abs(a - t))
-                .append("). Inside ").append(skew.window()).append("-base windows, mean |AT-skew| = ")
-                .append(String.format(Locale.ROOT, "%.4f", skew.meanAbsAtSkew()))
-                .append(" and ").append(skew.windowsPastThreshold())
-                .append(" windows exceed ").append(FrameSkewCensus.LOCAL_THRESHOLD).append(".\n");
+                .append("); mean |AT-skew| inside frames = ")
+                .append(String.format(Locale.ROOT, "%.4f", skew.meanAbsAtSkew())).append(".\n");
         md.append("4. **R4 Modal wrap is the window.** ").append(wraps.lineCount())
                 .append(" lines, modal width ").append(wraps.modalWidth())
+                .append(". Homopolymer longest ")
+                .append(runs.longestBase()).append("×").append(runs.longestLength())
                 .append(".\n\n");
     }
 

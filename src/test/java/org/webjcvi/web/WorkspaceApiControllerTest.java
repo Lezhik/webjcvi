@@ -117,6 +117,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("WebJCVI");
                     assertThat(html).contains("/tape");
                     assertThat(html).contains("/split");
+                    assertThat(html).contains("/drift");
                 });
     }
 
@@ -196,6 +197,47 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("alpha");
                     assertThat(html).contains("beta");
                     assertThat(html).contains("==========");
+                });
+    }
+
+    @Test
+    void pairDriftApiFlagsLocalImbalance() {
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/drift")
+                        .queryParam("text", "((((((((((          ))))))))))          ")
+                        .queryParam("window", "20")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.hotspotCount").isEqualTo(2)
+                .jsonPath("$.hotspots[0].opens").isEqualTo(10)
+                .jsonPath("$.hotspots[1].closes").isEqualTo(10);
+    }
+
+    @Test
+    void driftPageRenders() {
+        webTestClient.get()
+                .uri("/drift")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Pair drift"));
+    }
+
+    @Test
+    void driftPageFormFlagsLocalImbalance() {
+        webTestClient.post()
+                .uri("/drift")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=%28%28%28%28%28%28%28%28%28%28++++++++++%29%29%29%29%29%29%29%29%29%29++++++++++&window=20")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("hotspot");
+                    assertThat(html).contains("opens 10");
+                    assertThat(html).contains("closes 10");
                 });
     }
 }

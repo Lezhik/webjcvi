@@ -9,6 +9,7 @@ import org.webjcvi.report.DnaReportService;
 import org.webjcvi.segment.BannerSplitter;
 import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.tape.ScratchTape;
+import org.webjcvi.drift.PairDrift;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -37,6 +38,11 @@ public class WebJcviConfiguration {
     @Bean
     BannerSplitter bannerSplitter() {
         return new BannerSplitter();
+    }
+
+    @Bean
+    PairDrift pairDrift() {
+        return new PairDrift();
     }
 
     @Bean

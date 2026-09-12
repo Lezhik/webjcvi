@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.webjcvi.drift.PairDrift;
 import org.webjcvi.report.DnaReport;
 import org.webjcvi.report.DnaReportService;
 import org.webjcvi.segment.BannerSplitter;
@@ -30,16 +31,19 @@ public class WorkspaceApiController {
     private final DnaReportService reports;
     private final ScratchTape tape;
     private final BannerSplitter splitter;
+    private final PairDrift drift;
 
     public WorkspaceApiController(
             FileStorageService storage,
             DnaReportService reports,
             ScratchTape tape,
-            BannerSplitter splitter) {
+            BannerSplitter splitter,
+            PairDrift drift) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
         this.splitter = splitter;
+        this.drift = drift;
     }
 
     @GetMapping("/files")
@@ -144,6 +148,37 @@ public class WorkspaceApiController {
                             return row;
                         })
                         .toList())
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/drift")
+    public Mono<Map<String, Object>> drift(
+            @RequestParam("text") String text,
+            @RequestParam(name = "window", defaultValue = "70") int window) {
+        return Mono.fromCallable(() -> {
+                    var scan = drift.scan(text, window, PairDrift.DEFAULT_THRESHOLD);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("window", scan.window());
+                    body.put("windowCount", scan.windowCount());
+                    body.put("hotspotCount", scan.hotspotCount());
+                    body.put("opens", scan.opens());
+                    body.put("closes", scan.closes());
+                    body.put("globalSkew", scan.globalSkew());
+                    body.put("hotspots", scan.hotspots().stream()
+                            .map(hit -> {
+                                Map<String, Object> row = new LinkedHashMap<>();
+                                row.put("index", hit.index());
+                                row.put("offset", hit.offset());
+                                row.put("length", hit.length());
+                                row.put("opens", hit.opens());
+                                row.put("closes", hit.closes());
+                                row.put("skew", hit.skew());
+                                row.put("preview", hit.preview());
+                                return row;
+                            })
+                            .toList());
+                    return body;
+                })
                 .subscribeOn(Schedulers.boundedElastic());
     }
 }
