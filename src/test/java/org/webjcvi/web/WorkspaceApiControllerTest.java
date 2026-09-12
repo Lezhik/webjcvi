@@ -122,6 +122,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/rare");
                     assertThat(html).contains("/tokens");
                     assertThat(html).contains("/stamps");
+                    assertThat(html).contains("/fold");
                 });
     }
 
@@ -402,6 +403,46 @@ class WorkspaceApiControllerTest {
                 .value(html -> {
                     assertThat(html).contains("AAA");
                     assertThat(html).contains("Top stamp");
+                });
+    }
+
+    @Test
+    void foldApiFindsAbbaAndSkipsHomopolymer() {
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/fold")
+                        .queryParam("text", "xx ABBA TTTT yy")
+                        .queryParam("min", "4")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.hitCount").isEqualTo(1)
+                .jsonPath("$.hits[0].preview").isEqualTo("ABBA");
+    }
+
+    @Test
+    void foldPageRenders() {
+        webTestClient.get()
+                .uri("/fold")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Fold palindromes"));
+    }
+
+    @Test
+    void foldPageFormFindsAbba() {
+        webTestClient.post()
+                .uri("/fold")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=xx+ABBA+TTTT+yy&min=4")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("ABBA");
+                    assertThat(html).doesNotContain("TTTT");
+                    assertThat(html).contains("palindrome");
                 });
     }
 }

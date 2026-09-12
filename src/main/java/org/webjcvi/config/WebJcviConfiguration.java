@@ -14,6 +14,7 @@ import org.webjcvi.rare.RareClassScanner;
 import org.webjcvi.reflow.WrapReflow;
 import org.webjcvi.token.RareBreakTokenizer;
 import org.webjcvi.stamp.KmerStamp;
+import org.webjcvi.fold.PalindromeScan;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -67,6 +68,11 @@ public class WebJcviConfiguration {
     @Bean
     KmerStamp kmerStamp() {
         return new KmerStamp();
+    }
+
+    @Bean
+    PalindromeScan palindromeScan() {
+        return new PalindromeScan();
     }
 
     @Bean

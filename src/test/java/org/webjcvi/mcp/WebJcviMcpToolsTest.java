@@ -45,6 +45,7 @@ class WebJcviMcpToolsTest {
                         "rare_islands",
                         "cut_tokens",
                         "kmer_stamps",
+                        "find_palindromes",
                         "list_files",
                         "read_file");
     }
@@ -93,7 +94,7 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Same-base lags");
+        assertThat(markdown).contains("Foldback stems");
         assertThat(markdown).contains("Frame remainder");
     }
 
@@ -161,5 +162,15 @@ class WebJcviMcpToolsTest {
         assertThat(result).contains("AAA");
         assertThat(result).doesNotContain("hidden");
         assertThat(tools.readFile("secret.txt")).isEqualTo("hidden-stamp");
+    }
+
+    @Test
+    void findPalindromesDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "hidden ABBA");
+        String result = tools.findPalindromes("xx ABBA TTTT yy", 4);
+        assertThat(result).contains("ABBA");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(result).doesNotContain("TTTT");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("hidden ABBA");
     }
 }

@@ -15,6 +15,7 @@ import org.webjcvi.dna.CodonFrameCensus;
 import org.webjcvi.dna.DimerContrast;
 import org.webjcvi.dna.DnaParser;
 import org.webjcvi.dna.DnaSequence;
+import org.webjcvi.dna.FoldbackCensus;
 import org.webjcvi.dna.FrameSkewCensus;
 import org.webjcvi.dna.GcIslandCensus;
 import org.webjcvi.dna.HomopolymerProfile;
@@ -99,10 +100,11 @@ public final class DnaReportService {
         GcIslandCensus gcIslands = GcIslandCensus.from(sequence);
         CodonFrameCensus codons = CodonFrameCensus.from(sequence);
         SameBaseLagCensus lags = SameBaseLagCensus.from(sequence);
+        FoldbackCensus foldback = FoldbackCensus.from(sequence);
         Map<String, String> sections = buildSections(
-                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags);
+                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback);
         String markdown = renderMarkdown(
-                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags);
+                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback);
         storage.writeText(reportRelativePath(), markdown);
         return new DnaReport(generatedAt, sequence, sections, markdown);
     }
@@ -153,7 +155,8 @@ public final class DnaReportService {
             DimerContrast dimers,
             GcIslandCensus gcIslands,
             CodonFrameCensus codons,
-            SameBaseLagCensus lags) {
+            SameBaseLagCensus lags,
+            FoldbackCensus foldback) {
         Map<String, String> sections = new LinkedHashMap<>();
         sections.put("meta", "generatedAt=" + ISO.format(generatedAt));
         sections.put("length", Integer.toString(sequence.length()));
@@ -162,9 +165,10 @@ public final class DnaReportService {
         sections.put("invalidTotal", Long.toString(sequence.invalidTotal()));
         sections.put("javaSourceCount", Integer.toString(javaSources.size()));
         sections.put("wrapModalWidth", Integer.toString(wraps.modalWidth()));
-        sections.put("peakLag", Integer.toString(lags.peakLag()));
-        sections.put("peakLagEnrichment", String.format(Locale.ROOT, "%.3f", lags.peakEnrichment()));
-        sections.put("lagIndependent", String.format(Locale.ROOT, "%.4f", lags.independent()));
+        sections.put("rcStems", Integer.toString(foldback.rcStems()));
+        sections.put("longestRc", Integer.toString(foldback.longestRc()));
+        sections.put("sameEvenPalindromes", Integer.toString(foldback.sameEven()));
+        sections.put("longestSamePalindrome", Integer.toString(foldback.longestSame()));
         sections.put("longestHomopolymer", runs.longestBase() + "x" + runs.longestLength());
         return sections;
     }
@@ -182,15 +186,16 @@ public final class DnaReportService {
             DimerContrast dimers,
             GcIslandCensus gcIslands,
             CodonFrameCensus codons,
-            SameBaseLagCensus lags) {
+            SameBaseLagCensus lags,
+            FoldbackCensus foldback) {
         StringBuilder md = new StringBuilder();
         md.append("# WebJCVI DNA Report\n\n");
         md.append("Generated at **").append(ISO.format(generatedAt.atOffset(ZoneOffset.UTC))).append("**.\n\n");
         md.append("This report is rebuilt from `").append(dnaRelativePath)
-                .append("` and a snapshot of the current codebase. Version 8 of the builder ")
-                .append("measures same-base identity at lags 1, 2, 3, 10, and 70 versus the ")
-                .append("independence baseline sum p². Codon frames were phase-flat (TTT in every ")
-                .append("phase, GC spread 1.15%); this asks which distance actually repeats.\n\n");
+                .append("` and a snapshot of the current codebase. Version 9 of the builder ")
+                .append("counts reverse-complement foldback stems (A↔T, G↔C around a center) ")
+                .append("versus same-base palindromes. Forward lags were nearly independent ")
+                .append("(peak ×1.134); this asks whether identity folds instead.\n\n");
 
         md.append("## Sequence composition\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
@@ -231,47 +236,31 @@ public final class DnaReportService {
         md.append("First ").append(PREVIEW_BASES).append(" normalized bases:\n\n```\n");
         md.append(sequence.preview(PREVIEW_BASES)).append("\n```\n\n");
 
-        md.append("## Same-base lags\n\n");
-        md.append("Share of positions where tape[i] equals tape[i+lag], for canonical ATGC only. ")
-                .append("Enrichment is that share divided by sum p_b² (independence). Lag 1 is ")
-                .append("homopolymer continuation; lag 3 is codon-like; lag 70 is the wrap frame.\n\n");
-        md.append("| Lag | Matches | Pairs | Match % | Enrichment |\n| --- | --- | --- | --- | --- |\n");
-        for (var lag : lags.lags()) {
-            md.append("| ").append(lag.lag()).append(" | ")
-                    .append(lag.matches()).append(" | ")
-                    .append(lag.pairs()).append(" | ")
-                    .append(String.format(Locale.ROOT, "%.2f", lag.matchPercent())).append(" | ")
-                    .append(String.format(Locale.ROOT, "%.3f", lag.enrichment())).append(" |\n");
-        }
-        md.append("\n| Metric | Value |\n| --- | --- |\n");
-        md.append("| Independence baseline sum p² | ")
-                .append(String.format(Locale.ROOT, "%.4f", lags.independent())).append(" |\n");
-        md.append("| Peak lag | ").append(lags.peakLag()).append(" |\n");
-        md.append("| Peak enrichment | ")
-                .append(String.format(Locale.ROOT, "%.3f", lags.peakEnrichment())).append(" |\n\n");
-        md.append("`").append(lags.toTextRow()).append("`\n\n");
+        md.append("## Foldback stems\n\n");
+        md.append("Reverse-complement palindromes of length ≥ 4 (A pairs with T, G with C) ")
+                .append("versus even same-base palindromes that are not homopolymers. ")
+                .append("Pair counts are the complementary contacts inside RC stems.\n\n");
+        md.append("| Metric | Value |\n| --- | --- |\n");
+        md.append("| RC stems (even+odd) | ").append(foldback.rcStems()).append(" |\n");
+        md.append("| RC even / odd | ").append(foldback.rcEven()).append(" / ").append(foldback.rcOdd()).append(" |\n");
+        md.append("| Longest RC stem | ").append(foldback.longestRc()).append(" |\n");
+        md.append("| AT pairs in RC stems | ").append(foldback.rcAtPairs()).append(" |\n");
+        md.append("| GC pairs in RC stems | ").append(foldback.rcGcPairs()).append(" |\n");
+        md.append("| Same-base even palindromes | ").append(foldback.sameEven()).append(" |\n");
+        md.append("| Longest same-base palindrome | ").append(foldback.longestSame()).append(" |\n\n");
+        md.append("`").append(foldback.toTextRow()).append("`\n\n");
 
         md.append("## Frame remainder\n\n");
-        md.append("Codon frames: most ATG in phase **").append(codons.bestAtgPhase())
-                .append("** (").append(codons.maxAtg())
-                .append("), most stops in phase **").append(codons.bestStopPhase())
-                .append("** (").append(codons.maxStops())
-                .append("), max GC spread **")
+        md.append("Same-base lags: peak lag **").append(lags.peakLag())
+                .append("** enrichment **")
+                .append(String.format(Locale.ROOT, "%.3f", lags.peakEnrichment()))
+                .append("** vs independence **")
+                .append(String.format(Locale.ROOT, "%.4f", lags.independent()))
+                .append("**. Codon GC spread **")
                 .append(String.format(Locale.ROOT, "%.2f", codons.maxGcSpread()))
-                .append("**. GC islands **").append(gcIslands.gcIslands())
-                .append("**, longest **").append(gcIslands.longestGc())
-                .append("**, ≥10 **").append(gcIslands.gcIslandsAtLeast10())
-                .append("**. AT islands **").append(gcIslands.atIslands())
-                .append("**, longest **").append(gcIslands.longestAt())
-                .append("**. Wrap min/median/modal/max: ")
-                .append(wraps.minWidth()).append(" / ")
-                .append(wraps.medianWidth()).append(" / ")
-                .append(wraps.modalWidth()).append(" / ")
-                .append(wraps.maxWidth())
-                .append(". Joint vs global same-base dimers **")
-                .append(String.format(Locale.ROOT, "%.1f%%", dimers.sameBaseGlobalShare()))
-                .append(" / ")
-                .append(String.format(Locale.ROOT, "%.1f%%", dimers.sameBaseJointShare()))
+                .append("**. GC islands longest **").append(gcIslands.longestGc())
+                .append("**, AT longest **").append(gcIslands.longestAt())
+                .append("**. Wrap modal **").append(wraps.modalWidth())
                 .append("**. Homopolymer longest **")
                 .append(runs.longestBase()).append(" × ").append(runs.longestLength())
                 .append("**. Mean |AT-skew| **")
@@ -279,7 +268,7 @@ public final class DnaReportService {
                 .append("**.\n\n");
 
         md.append("## Extracted tape rules\n\n");
-        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags);
+        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback);
 
         md.append("## Codebase snapshot\n\n");
         md.append(javaSources.size()).append(" Java source files under `src/main/java`:\n\n");
@@ -294,20 +283,20 @@ public final class DnaReportService {
 
         md.append("## Growth notes for the next iteration\n\n");
         md.append("- Dominant canonical base: **").append(dominantBase(sequence)).append("**.\n");
-        md.append("- Same-base lags: peak lag **").append(lags.peakLag())
-                .append("** with enrichment **")
-                .append(String.format(Locale.ROOT, "%.3f", lags.peakEnrichment()))
-                .append("** vs independence **")
-                .append(String.format(Locale.ROOT, "%.4f", lags.independent()))
-                .append("**. If lag 1 wins, identity is local (homopolymer/stamps); ")
-                .append("if lag 70 wins, wrap still matters; if all lags ≈ 1.0, the tape is ")
-                .append("memoryless and k-mer stamps are just letter frequency.\n");
-        md.append("- Codon remainder: ATG phase **").append(codons.bestAtgPhase())
-                .append("**, stop phase **").append(codons.bestStopPhase())
-                .append("**, GC spread **")
-                .append(String.format(Locale.ROOT, "%.2f", codons.maxGcSpread())).append("**.\n");
-        md.append("- GC islands longest **").append(gcIslands.longestGc())
-                .append("**, AT longest **").append(gcIslands.longestAt()).append("**.\n");
+        md.append("- Foldback: RC stems **").append(foldback.rcStems())
+                .append("**, longest **").append(foldback.longestRc())
+                .append("**, even/odd **").append(foldback.rcEven()).append("/")
+                .append(foldback.rcOdd())
+                .append("**, AT/GC pairs **").append(foldback.rcAtPairs()).append("/")
+                .append(foldback.rcGcPairs())
+                .append("**. Same-base even palindromes **").append(foldback.sameEven())
+                .append("**, longest **").append(foldback.longestSame())
+                .append("**. If RC stems are no longer than same-base palindromes, foldback ")
+                .append("is not privileged over letter palindromes; the next hypothesis should ")
+                .append("drop pairing or look at stem stacking / hairpin gaps.\n");
+        md.append("- Same-base lag remainder: peak **").append(lags.peakLag())
+                .append("** × ")
+                .append(String.format(Locale.ROOT, "%.3f", lags.peakEnrichment())).append(".\n");
         md.append("- Homopolymer longest **").append(runs.longestBase()).append(" × ")
                 .append(runs.longestLength()).append("**.\n");
         md.append("- Module split (TZ §6.12) is **not** indicated: single Gradle module, no sub-module reports.\n");
@@ -330,25 +319,24 @@ public final class DnaReportService {
             DimerContrast dimers,
             GcIslandCensus gcIslands,
             CodonFrameCensus codons,
-            SameBaseLagCensus lags) {
+            SameBaseLagCensus lags,
+            FoldbackCensus foldback) {
         long a = sequence.canonicalCounts().getOrDefault('A', 0L);
         long t = sequence.canonicalCounts().getOrDefault('T', 0L);
-        md.append("1. **R1 Period-3 is not coding-like.** GC spread ")
-                .append(String.format(Locale.ROOT, "%.2f", codons.maxGcSpread()))
-                .append("; ATG phase ").append(codons.bestAtgPhase())
-                .append(" vs stop phase ").append(codons.bestStopPhase())
-                .append(".\n");
-        md.append("2. **R2 The mode 3-mer is phase-invariant.** TTT led every codon frame; ")
-                .append("k=3 stamps are the payload, not an ORF. Global A=").append(a)
-                .append(", T=").append(t).append(".\n");
-        md.append("3. **R3 Identity has a preferred lag.** Peak lag ")
+        md.append("1. **R1 Forward identity is nearly chance.** Peak lag ")
                 .append(lags.peakLag()).append(" enrichment ")
                 .append(String.format(Locale.ROOT, "%.3f", lags.peakEnrichment()))
-                .append(" vs independence ")
-                .append(String.format(Locale.ROOT, "%.4f", lags.independent()))
-                .append(".\n");
-        md.append("4. **R4 Wrap and rare islands remain remainder.** Wrap modal ")
-                .append(wraps.modalWidth())
+                .append("; lag 2 is the depleted slot.\n");
+        md.append("2. **R2 Chargaff is a fold, not a forward lag.** RC stems ")
+                .append(foldback.rcStems()).append(", longest ").append(foldback.longestRc())
+                .append(", even/odd ").append(foldback.rcEven()).append("/").append(foldback.rcOdd())
+                .append(". Global A=").append(a).append(", T=").append(t).append(".\n");
+        md.append("3. **R3 Same-base palindromes are the text analog.** ")
+                .append(foldback.sameEven()).append(" even non-homopolymer palindromes, longest ")
+                .append(foldback.longestSame()).append(".\n");
+        md.append("4. **R4 Remainder.** Wrap modal ").append(wraps.modalWidth())
+                .append("; GC spread ")
+                .append(String.format(Locale.ROOT, "%.2f", codons.maxGcSpread()))
                 .append("; same-base dimers ")
                 .append(String.format(Locale.ROOT, "%.1f%%", dimers.sameBaseGlobalShare()))
                 .append("/")
@@ -358,7 +346,6 @@ public final class DnaReportService {
                 .append("; skew fail/pass ")
                 .append(islands.failIslands()).append("/").append(islands.passIslands())
                 .append("; GC island max ").append(gcIslands.longestGc())
-                .append("; AT max ").append(gcIslands.longestAt())
                 .append("; homopolymer ")
                 .append(runs.longestBase()).append("×").append(runs.longestLength())
                 .append("; mean |AT-skew| ")

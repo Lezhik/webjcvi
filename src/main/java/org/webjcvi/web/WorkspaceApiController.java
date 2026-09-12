@@ -14,6 +14,7 @@ import org.webjcvi.rare.RareClassScanner;
 import org.webjcvi.reflow.WrapReflow;
 import org.webjcvi.token.RareBreakTokenizer;
 import org.webjcvi.stamp.KmerStamp;
+import org.webjcvi.fold.PalindromeScan;
 import org.webjcvi.report.DnaReport;
 import org.webjcvi.report.DnaReportService;
 import org.webjcvi.segment.BannerSplitter;
@@ -40,6 +41,7 @@ public class WorkspaceApiController {
     private final RareClassScanner rareScanner;
     private final RareBreakTokenizer tokenizer;
     private final KmerStamp stamp;
+    private final PalindromeScan palindromes;
 
     public WorkspaceApiController(
             FileStorageService storage,
@@ -50,7 +52,8 @@ public class WorkspaceApiController {
             WrapReflow wrapReflow,
             RareClassScanner rareScanner,
             RareBreakTokenizer tokenizer,
-            KmerStamp stamp) {
+            KmerStamp stamp,
+            PalindromeScan palindromes) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
@@ -60,6 +63,7 @@ public class WorkspaceApiController {
         this.rareScanner = rareScanner;
         this.tokenizer = tokenizer;
         this.stamp = stamp;
+        this.palindromes = palindromes;
     }
 
     @GetMapping("/files")
@@ -293,6 +297,31 @@ public class WorkspaceApiController {
                                 item.put("kmer", row.kmer());
                                 item.put("count", row.count());
                                 return item;
+                            })
+                            .toList());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/fold")
+    public Mono<Map<String, Object>> findPalindromes(
+            @RequestParam("text") String text,
+            @RequestParam(name = "min", defaultValue = "4") int minLength) {
+        return Mono.fromCallable(() -> {
+                    var scan = palindromes.find(text, minLength);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("scanned", scan.scanned());
+                    body.put("hitCount", scan.hitCount());
+                    body.put("longest", scan.longest());
+                    body.put("hits", scan.hits().stream()
+                            .map(hit -> {
+                                Map<String, Object> row = new LinkedHashMap<>();
+                                row.put("index", hit.index());
+                                row.put("offset", hit.offset());
+                                row.put("length", hit.length());
+                                row.put("preview", hit.preview());
+                                return row;
                             })
                             .toList());
                     return body;

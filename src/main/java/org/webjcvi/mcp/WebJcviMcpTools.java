@@ -23,6 +23,8 @@ import org.webjcvi.token.RareBreakTokenizer;
 import org.webjcvi.token.TokenException;
 import org.webjcvi.stamp.KmerStamp;
 import org.webjcvi.stamp.StampException;
+import org.webjcvi.fold.FoldException;
+import org.webjcvi.fold.PalindromeScan;
 
 /**
  * MCP tool surface. File tools go through {@link FileStorageService}. The
@@ -41,10 +43,12 @@ public class WebJcviMcpTools {
     private final RareClassScanner rare;
     private final RareBreakTokenizer tokenizer;
     private final KmerStamp stamp;
+    private final PalindromeScan palindromes;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
         this(storage, reports, new ScratchTape(), new BannerSplitter(), new PairDrift(),
-                new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer(), new KmerStamp());
+                new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer(), new KmerStamp(),
+                new PalindromeScan());
     }
 
     @Autowired
@@ -57,7 +61,8 @@ public class WebJcviMcpTools {
             WrapReflow reflow,
             RareClassScanner rare,
             RareBreakTokenizer tokenizer,
-            KmerStamp stamp) {
+            KmerStamp stamp,
+            PalindromeScan palindromes) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
@@ -67,6 +72,7 @@ public class WebJcviMcpTools {
         this.rare = rare;
         this.tokenizer = tokenizer;
         this.stamp = stamp;
+        this.palindromes = palindromes;
     }
 
     @Tool(name = "regenerate_dna_report", description = "Clear prior reports and rebuild the DNA report from jcvi-dna.txt and the current codebase.")
@@ -274,6 +280,29 @@ public class WebJcviMcpTools {
         });
     }
 
+    @Tool(name = "find_palindromes", description = "Find even palindromes (length at least 4, not homopolymers) in caller-supplied text after folding case and dropping whitespace. Not the DNA file and not a project path.")
+    public String findPalindromes(
+            @ToolParam(description = "Arbitrary text to scan") String text,
+            @ToolParam(description = "Minimum palindrome length; use 4 unless you need a different floor") int minLength) {
+        return run(() -> {
+            int floor = minLength < 4 ? PalindromeScan.DEFAULT_MIN : minLength;
+            var scan = palindromes.find(text, floor);
+            StringBuilder out = new StringBuilder(scan.summary()).append('\n');
+            if (scan.hits().isEmpty()) {
+                out.append("(no palindromes)");
+                return out.toString();
+            }
+            for (var hit : scan.hits()) {
+                out.append("#").append(hit.index())
+                        .append(" offset ").append(hit.offset())
+                        .append(" length ").append(hit.length())
+                        .append('\n')
+                        .append(hit.preview()).append('\n');
+            }
+            return out.toString();
+        });
+    }
+
     @Tool(name = "list_files", description = "List files inside the project directory. Paths must be relative to the project root.")
     public String listFiles(
             @ToolParam(description = "Relative directory to list, or '.' for the project root") String path,
@@ -298,7 +327,7 @@ public class WebJcviMcpTools {
         try {
             return action.execute();
         } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException
-                 | RareException | TokenException | StampException e) {
+                 | RareException | TokenException | StampException | FoldException e) {
             return "Error: " + e.getMessage();
         }
     }
