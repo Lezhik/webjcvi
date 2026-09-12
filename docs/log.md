@@ -117,3 +117,13 @@ This file is append-only. Each iteration adds a new section; earlier entries are
 - **Cons:** Hamming substitutions are not DNA reverse-complement mismatches — mapping complementary-pair errors onto letter typos is analogical. Insertions/deletions are ignored (EROR vs ERROR of different length will miss). Min motif 4 is awkward for short English words. MAX_HITS=40 is a usefulness cap. The tool is a thin sliding window, not an aligner.
 - **Report builder changes:** Replaced the gapped-hairpin-by-loop lead with a **fixed-window pairing-mismatch census**: Hamming distance 0–4 of each 4-mer versus the reverse-complement of the adjacent 4-mer, versus binomial expectation from complementary-pair chance 2pA pT + 2pG pC, plus modal distance and distance-0 enrichment. Hairpin loop counts shrink to a remainder line. This is a different reading (mismatch distance as the variable, not loop width of exact stems) so the next hypothesis can keep or abandon fuzzy search based on whether distance 0 is actually enriched or the histogram is just binomial.
 
+---
+
+## Spec change (not an iteration): log-analysis loop
+
+Pros/cons of a hypothesis as a log-analysis system are no longer speculative. Algorithms
+must emit DEBUG logs (`if (log.isDebugEnabled()) { log.debug(...); }`). Before pros/cons
+the full test suite writes `reports/logs/test.log`; the log-analysis facade then writes
+`reports/logs/report.json`. The agent must read that JSON and ground Pros/Cons in it.
+See `docs/tz.md` §5.6–5.7 and §6.7–6.9. This is infrastructure, not Iteration #11.
+

@@ -2,6 +2,8 @@ package org.webjcvi.reflow;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.webjcvi.tape.ScratchTape;
 
 /**
@@ -17,6 +19,8 @@ public final class WrapReflow {
     public static final int MAX_CHARS = ScratchTape.MAX_CHARS;
     public static final int MAX_PARAGRAPHS = 80;
     public static final int PREVIEW_CHARS = 240;
+
+    private static final Logger log = LoggerFactory.getLogger(WrapReflow.class);
 
     public Result unwrap(String text) {
         return unwrap(text, DEFAULT_WIDTH);
@@ -60,7 +64,12 @@ public final class WrapReflow {
         for (int i = 0; i < limit; i++) {
             shown.add(new Paragraph(i, paragraphs.get(i).length(), preview(paragraphs.get(i))));
         }
-        return new Result(frame, lines.size(), stitches, total, List.copyOf(shown));
+        Result result = new Result(frame, lines.size(), stitches, total, List.copyOf(shown));
+        if (log.isDebugEnabled()) {
+            log.debug("reflow.unwrap chars={} width={} lines={} stitches={} paragraphs={}",
+                    text.length(), frame, lines.size(), stitches, total);
+        }
+        return result;
     }
 
     private static void flush(List<String> paragraphs, StringBuilder current) {

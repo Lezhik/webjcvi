@@ -27,6 +27,8 @@ import org.webjcvi.dna.WrapCensus;
 import org.webjcvi.dna.WrapJointCensus;
 import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.storage.StorageNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Fixed-API DNA reader and report builder. Reads {@code jcvi-dna.txt} and
@@ -40,6 +42,7 @@ public final class DnaReportService {
     public static final String DEFAULT_REPORT_DIRECTORY = "build/reports/dna";
     public static final String DEFAULT_REPORT_FILE_NAME = "dna-report.md";
 
+    private static final Logger log = LoggerFactory.getLogger(DnaReportService.class);
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_INSTANT;
     private static final int PREVIEW_BASES = 80;
 
@@ -83,6 +86,9 @@ public final class DnaReportService {
      * scope, re-reads the DNA file, and writes a fresh markdown report.
      */
     public DnaReport regenerate() {
+        if (log.isDebugEnabled()) {
+            log.debug("dna-report.regenerate.start path={}", dnaRelativePath);
+        }
         storage.deleteContents(reportDirectory);
         String raw;
         try {
@@ -110,6 +116,10 @@ public final class DnaReportService {
         String markdown = renderMarkdown(
                 sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches);
         storage.writeText(reportRelativePath(), markdown);
+        if (log.isDebugEnabled()) {
+            log.debug("dna-report.regenerate.done bases={} markdownChars={} path={}",
+                    sequence.length(), markdown.length(), reportRelativePath());
+        }
         return new DnaReport(generatedAt, sequence, sections, markdown);
     }
 

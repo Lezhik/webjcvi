@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.webjcvi.tape.ScratchTape;
 
 /**
@@ -20,6 +22,8 @@ public final class FuzzyFind {
     public static final int MAX_MOTIF = 80;
     public static final int MAX_CHARS = ScratchTape.MAX_CHARS;
     public static final int MAX_HITS = 40;
+
+    private static final Logger log = LoggerFactory.getLogger(FuzzyFind.class);
 
     public Scan search(String text, String motif) {
         return search(text, motif, DEFAULT_MAX_DIST);
@@ -64,7 +68,11 @@ public final class FuzzyFind {
             Hit h = hits.get(i);
             hits.set(i, new Hit(i, h.offset(), h.distance(), h.preview()));
         }
-        return new Scan(scanned, hits.size(), m, cap, List.copyOf(hits));
+        Scan scan = new Scan(scanned, hits.size(), m, cap, List.copyOf(hits));
+        if (log.isDebugEnabled()) {
+            log.debug("fuzzy.search chars={} motifChars={} {}", text.length(), m, scan.summary());
+        }
+        return scan;
     }
 
     private static String fold(String text) {

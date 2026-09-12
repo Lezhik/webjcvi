@@ -5,6 +5,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Line-width census of the raw FASTA-like tape. The v1 report only stored a
@@ -18,6 +20,8 @@ public final class WrapCensus {
     private final int medianWidth;
     private final int modalWidth;
 
+    private static final Logger log = LoggerFactory.getLogger(WrapCensus.class);
+
     private WrapCensus(int lineCount, int minWidth, int maxWidth, int medianWidth, int modalWidth) {
         this.lineCount = lineCount;
         this.minWidth = minWidth;
@@ -28,7 +32,13 @@ public final class WrapCensus {
 
     public static WrapCensus fromRaw(String raw) {
         Objects.requireNonNull(raw, "raw");
+        if (log.isDebugEnabled()) {
+            log.debug("wrap.start chars={}", raw.length());
+        }
         if (raw.isEmpty()) {
+            if (log.isDebugEnabled()) {
+                log.debug("wrap.done empty");
+            }
             return new WrapCensus(0, 0, 0, 0, 0);
         }
         List<Integer> widths = new ArrayList<>();
@@ -51,7 +61,11 @@ public final class WrapCensus {
         int max = sorted.getLast();
         int median = sorted.get(sorted.size() / 2);
         int modal = modalValue(widths);
-        return new WrapCensus(widths.size(), min, max, median, modal);
+        WrapCensus census = new WrapCensus(widths.size(), min, max, median, modal);
+        if (log.isDebugEnabled()) {
+            log.debug("wrap.done lines={} modalWidth={}", widths.size(), modal);
+        }
+        return census;
     }
 
     private static int modalValue(List<Integer> widths) {

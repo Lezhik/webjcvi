@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Overlapping dinucleotides of the whole tape versus dinucleotides sampled
@@ -14,6 +16,8 @@ import java.util.Objects;
  * background (AT-rich TT/AA).
  */
 public final class DimerContrast {
+
+    private static final Logger log = LoggerFactory.getLogger(DimerContrast.class);
 
     public record Row(String dimer, long globalCount, double globalShare, long jointCount, double jointShare, double enrichment) {
     }
@@ -52,6 +56,9 @@ public final class DimerContrast {
     public static DimerContrast from(DnaSequence sequence, WrapJointCensus joints) {
         Objects.requireNonNull(sequence, "sequence");
         Objects.requireNonNull(joints, "joints");
+        if (log.isDebugEnabled()) {
+            log.debug("dimer-contrast.start length={} joints={}", sequence.length(), joints.jointCount());
+        }
         Map<String, Long> global = overlapping(sequence.normalized());
         long globalTotal = global.values().stream().mapToLong(Long::longValue).sum();
         Map<String, Long> jointMap = joints.allJoints();
@@ -90,8 +97,12 @@ public final class DimerContrast {
         List<Row> top = rows.subList(0, Math.min(8, rows.size()));
         double sameG = globalTotal == 0 ? 0.0 : 100.0 * sameGlobal / globalTotal;
         double sameJ = jointTotal == 0 ? 0.0 : 100.0 * sameJoint / jointTotal;
-        return new DimerContrast(
+        DimerContrast contrast = new DimerContrast(
                 globalTotal, jointTotal, sameG, sameJ, enriched, enrichedValue, depleted, depletedValue, top);
+        if (log.isDebugEnabled()) {
+            log.debug("dimer-contrast.done global={} joints={} mostEnriched={}", globalTotal, jointTotal, enriched);
+        }
+        return contrast;
     }
 
     private static Map<String, Long> overlapping(String bases) {

@@ -4,6 +4,8 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Homopolymer run census on the normalized tape. The v1 report only counted
@@ -15,6 +17,8 @@ public final class HomopolymerProfile {
     public static final int SHORT = 5;
     public static final int MEDIUM = 10;
     public static final int LONG = 20;
+
+    private static final Logger log = LoggerFactory.getLogger(HomopolymerProfile.class);
 
     private final Map<Character, Long> maxRun;
     private final long runsAtLeast5;
@@ -43,6 +47,9 @@ public final class HomopolymerProfile {
 
     public static HomopolymerProfile from(DnaSequence sequence) {
         Objects.requireNonNull(sequence, "sequence");
+        if (log.isDebugEnabled()) {
+            log.debug("homopolymer.start length={}", sequence.length());
+        }
         Map<Character, Long> max = new LinkedHashMap<>();
         for (int i = 0; i < DnaSequence.CANONICAL_BASES.length(); i++) {
             max.put(DnaSequence.CANONICAL_BASES.charAt(i), 0L);
@@ -81,7 +88,11 @@ public final class HomopolymerProfile {
             }
             i = j;
         }
-        return new HomopolymerProfile(max, ge5, b5, b10, b20, longestBase, longest);
+        HomopolymerProfile profile = new HomopolymerProfile(max, ge5, b5, b10, b20, longestBase, longest);
+        if (log.isDebugEnabled()) {
+            log.debug("homopolymer.done ge5={} longest={}{}", ge5, longest, longestBase);
+        }
+        return profile;
     }
 
     public Map<Character, Long> maxRun() {

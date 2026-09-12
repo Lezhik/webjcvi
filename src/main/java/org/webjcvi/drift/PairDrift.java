@@ -3,6 +3,8 @@ package org.webjcvi.drift;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.webjcvi.tape.ScratchTape;
 
 /**
@@ -18,6 +20,8 @@ public final class PairDrift {
     public static final int MAX_CHARS = ScratchTape.MAX_CHARS;
     public static final int MAX_HOTSPOTS = 80;
     public static final int PREVIEW_CHARS = 80;
+
+    private static final Logger log = LoggerFactory.getLogger(PairDrift.class);
 
     private static final String OPENS = "([{<";
     private static final String CLOSES = ")]}>";
@@ -41,6 +45,9 @@ public final class PairDrift {
             throw new DriftException("threshold must be in [0, 1)");
         }
         if (text.isEmpty()) {
+            if (log.isDebugEnabled()) {
+                log.debug("drift.scan empty window={} threshold={}", width, threshold);
+            }
             return new Scan(width, 0, 0, 0, 0, 0.0, List.of());
         }
         int opensTotal = 0;
@@ -69,7 +76,7 @@ public final class PairDrift {
             }
             windows++;
         }
-        return new Scan(
+        Scan scan = new Scan(
                 width,
                 windows,
                 hotspots.size(),
@@ -77,6 +84,10 @@ public final class PairDrift {
                 closesTotal,
                 skew(opensTotal, closesTotal),
                 List.copyOf(hotspots));
+        if (log.isDebugEnabled()) {
+            log.debug("drift.scan chars={} {}", text.length(), scan.summary());
+        }
+        return scan;
     }
 
     static double skew(int left, int right) {

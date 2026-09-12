@@ -32,4 +32,17 @@ class FuzzyFindTest {
                 .isInstanceOf(FuzzyException.class)
                 .hasMessageContaining("exceeds");
     }
+
+    @Test
+    void emptyTextWithValidMotifHasNoHits() {
+        FuzzyFind.Scan scan = fuzzy.search("", "abcd");
+        assertThat(scan.hitCount()).isZero();
+        assertThat(scan.scanned()).isZero();
+    }
+
+    @Test
+    void nullTextIsRejected() {
+        assertThatThrownBy(() -> fuzzy.search(null, "abcd"))
+                .isInstanceOf(FuzzyException.class);
+    }
 }

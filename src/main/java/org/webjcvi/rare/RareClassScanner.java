@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.webjcvi.tape.ScratchTape;
 
 /**
@@ -26,6 +28,8 @@ public final class RareClassScanner {
     public static final int MAX_ISLANDS = 80;
     public static final int PREVIEW_CHARS = 80;
 
+    private static final Logger log = LoggerFactory.getLogger(RareClassScanner.class);
+
     public Scan scan(String text) {
         return scan(text, DEFAULT_MIN_ISLAND);
     }
@@ -42,7 +46,11 @@ public final class RareClassScanner {
             throw new RareException("Text exceeds " + MAX_CHARS + " characters");
         }
         Freq freq = frequencies(text);
-        return rareClass(freq.counts(), freq.total());
+        Set<Character> symbols = rareClass(freq.counts(), freq.total());
+        if (log.isDebugEnabled()) {
+            log.debug("rare.symbols chars={} classSize={} total={}", text.length(), symbols.size(), freq.total());
+        }
+        return symbols;
     }
 
     public Scan scan(String text, int minIsland) {
@@ -58,6 +66,9 @@ public final class RareClassScanner {
         String rareLabel = rareLabel(rare);
         long total = freq.total();
         if (total == 0 || rare.isEmpty()) {
+            if (log.isDebugEnabled()) {
+                log.debug("rare.scan chars={} empty class=[{}]", text.length(), rareLabel);
+            }
             return new Scan(rareLabel, total, 0, 0, List.of());
         }
         List<Island> islands = new ArrayList<>();
@@ -86,7 +97,11 @@ public final class RareClassScanner {
             }
             i = j;
         }
-        return new Scan(rareLabel, total, rare.size(), islands.size(), List.copyOf(islands));
+        Scan scan = new Scan(rareLabel, total, rare.size(), islands.size(), List.copyOf(islands));
+        if (log.isDebugEnabled()) {
+            log.debug("rare.scan chars={} {}", text.length(), scan.summary());
+        }
+        return scan;
     }
 
     static Freq frequencies(String text) {

@@ -46,4 +46,17 @@ class PairDriftTest {
                 .isInstanceOf(DriftException.class)
                 .hasMessageContaining("exceeds");
     }
+
+    @Test
+    void emptyTextHasNoWindows() {
+        PairDrift.Scan scan = drift.scan("");
+        assertThat(scan.windowCount()).isZero();
+        assertThat(scan.hotspotCount()).isZero();
+    }
+
+    @Test
+    void nullTextIsRejected() {
+        assertThatThrownBy(() -> drift.scan(null))
+                .isInstanceOf(DriftException.class);
+    }
 }

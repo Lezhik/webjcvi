@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Dinucleotides at FASTA wrap joints (last base of line N + first of line N+1).
@@ -14,6 +16,8 @@ import java.util.Objects;
  * on the glue between frames.
  */
 public final class WrapJointCensus {
+
+    private static final Logger log = LoggerFactory.getLogger(WrapJointCensus.class);
 
     private final int jointCount;
     private final int complementaryJoints;
@@ -39,6 +43,9 @@ public final class WrapJointCensus {
 
     public static WrapJointCensus fromRaw(String raw) {
         Objects.requireNonNull(raw, "raw");
+        if (log.isDebugEnabled()) {
+            log.debug("wrap-joint.start chars={}", raw.length());
+        }
         List<String> lines = lines(raw);
         Map<String, Long> counts = new LinkedHashMap<>();
         int joints = 0;
@@ -73,7 +80,11 @@ public final class WrapJointCensus {
         }
         String best = ranked.isEmpty() ? "" : ranked.getFirst().getKey();
         long bestCount = ranked.isEmpty() ? 0L : ranked.getFirst().getValue();
-        return new WrapJointCensus(joints, complementary, best, bestCount, top, counts);
+        WrapJointCensus census = new WrapJointCensus(joints, complementary, best, bestCount, top, counts);
+        if (log.isDebugEnabled()) {
+            log.debug("wrap-joint.done joints={} complementary={}", joints, complementary);
+        }
+        return census;
     }
 
     private static List<String> lines(String raw) {

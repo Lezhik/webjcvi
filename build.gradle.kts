@@ -30,8 +30,25 @@ dependencies {
     testImplementation("com.tngtech.archunit:archunit-junit5:$archUnitVersion")
 }
 
-tasks.withType<Test> {
+tasks.test {
     useJUnitPlatform()
+    doFirst {
+        val journalDir = rootProject.layout.projectDirectory.dir("reports/logs").asFile
+        journalDir.mkdirs()
+        val journal = journalDir.resolve("test.log")
+        if (journal.exists() && !journal.delete()) {
+            throw GradleException("Unable to clear previous test journal: ${journal.absolutePath}")
+        }
+    }
+}
+
+tasks.register<JavaExec>("analyzeLogs") {
+    group = "webjcvi"
+    description = "Run tests (DEBUG journal) then analyze reports/logs/test.log into reports/logs/report.json"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("org.webjcvi.logs.GenerateLogAnalysisMain")
+    workingDir = rootProject.projectDir
+    dependsOn(tasks.test)
 }
 
 tasks.register<JavaExec>("generateDnaReport") {

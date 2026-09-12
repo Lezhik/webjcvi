@@ -57,4 +57,17 @@ class BannerSplitterTest {
         assertThatThrownBy(() -> splitter.split("ab", 1))
                 .isInstanceOf(SegmentException.class);
     }
+
+    @Test
+    void emptyTextYieldsOneSection() {
+        var sections = splitter.split("");
+        assertThat(sections).hasSize(1);
+        assertThat(sections.get(0).length()).isZero();
+    }
+
+    @Test
+    void nullTextIsRejected() {
+        assertThatThrownBy(() -> splitter.split(null))
+                .isInstanceOf(SegmentException.class);
+    }
 }

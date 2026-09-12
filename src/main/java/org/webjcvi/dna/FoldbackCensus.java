@@ -2,6 +2,8 @@ package org.webjcvi.dna;
 
 import java.util.Locale;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Reverse-complement foldback stems versus same-base palindromes. Forward
@@ -12,6 +14,8 @@ public final class FoldbackCensus {
 
     public static final int MIN_STEM = 4;
     public static final int MAX_RADIUS = 200;
+
+    private static final Logger log = LoggerFactory.getLogger(FoldbackCensus.class);
 
     private final int rcEven;
     private final int rcOdd;
@@ -40,6 +44,9 @@ public final class FoldbackCensus {
 
     public static FoldbackCensus from(DnaSequence sequence) {
         Objects.requireNonNull(sequence, "sequence");
+        if (log.isDebugEnabled()) {
+            log.debug("foldback.start length={}", sequence.length());
+        }
         StringBuilder canonical = new StringBuilder();
         for (int i = 0; i < sequence.normalized().length(); i++) {
             char ch = sequence.normalized().charAt(i);
@@ -79,7 +86,11 @@ public final class FoldbackCensus {
                 longestSame = Math.max(longestSame, evenSame);
             }
         }
-        return new FoldbackCensus(rcEven, rcOdd, longestRc, rcAtPairs, rcGcPairs, sameEven, longestSame);
+        FoldbackCensus census = new FoldbackCensus(rcEven, rcOdd, longestRc, rcAtPairs, rcGcPairs, sameEven, longestSame);
+        if (log.isDebugEnabled()) {
+            log.debug("foldback.done rcEven={} rcOdd={} longestRc={}", rcEven, rcOdd, longestRc);
+        }
+        return census;
     }
 
     private static int expandEven(String tape, int leftOfCenter, boolean complement) {

@@ -33,4 +33,16 @@ class RareBreakTokenizerTest {
                 .isInstanceOf(TokenException.class)
                 .hasMessageContaining("exceeds");
     }
+
+    @Test
+    void emptyTextHasNoTokens() {
+        RareBreakTokenizer.Cut cut = tokenizer.cut("");
+        assertThat(cut.tokenCount()).isZero();
+    }
+
+    @Test
+    void nullTextIsRejected() {
+        assertThatThrownBy(() -> tokenizer.cut(null))
+                .isInstanceOf(TokenException.class);
+    }
 }

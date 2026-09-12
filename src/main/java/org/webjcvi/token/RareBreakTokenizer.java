@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.webjcvi.rare.RareClassScanner;
 import org.webjcvi.rare.RareException;
 import org.webjcvi.tape.ScratchTape;
@@ -21,6 +23,8 @@ public final class RareBreakTokenizer {
     public static final int MAX_CHARS = ScratchTape.MAX_CHARS;
     public static final int MAX_TOKENS = 80;
     public static final int PREVIEW_CHARS = 80;
+
+    private static final Logger log = LoggerFactory.getLogger(RareBreakTokenizer.class);
 
     private final RareClassScanner rareScanner;
 
@@ -78,7 +82,11 @@ public final class RareBreakTokenizer {
             }
             i = j;
         }
-        return new Cut(rareLabel, rare.size(), tokens.size(), List.copyOf(tokens));
+        Cut cut = new Cut(rareLabel, rare.size(), tokens.size(), List.copyOf(tokens));
+        if (log.isDebugEnabled()) {
+            log.debug("token.cut chars={} {}", text.length(), cut.summary());
+        }
+        return cut;
     }
 
     private static String rareLabel(Set<Character> rare) {

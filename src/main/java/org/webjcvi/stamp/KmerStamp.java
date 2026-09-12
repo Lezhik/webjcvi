@@ -6,6 +6,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.webjcvi.tape.ScratchTape;
 
 /**
@@ -20,6 +22,8 @@ public final class KmerStamp {
     public static final int MAX_CHARS = ScratchTape.MAX_CHARS;
     public static final int MAX_STAMPS = 20;
     public static final int MIN_COUNT = 2;
+
+    private static final Logger log = LoggerFactory.getLogger(KmerStamp.class);
 
     public Census rank(String text) {
         return rank(text, DEFAULT_K);
@@ -64,7 +68,11 @@ public final class KmerStamp {
         }
         String top = stamps.isEmpty() ? "" : stamps.get(0).kmer();
         long topCount = stamps.isEmpty() ? 0L : stamps.get(0).count();
-        return new Census(width, tape.length(), freq.size(), top, topCount, List.copyOf(stamps));
+        Census census = new Census(width, tape.length(), freq.size(), top, topCount, List.copyOf(stamps));
+        if (log.isDebugEnabled()) {
+            log.debug("stamp.rank chars={} {}", text.length(), census.summary());
+        }
+        return census;
     }
 
     public record Census(int k, int scanned, int distinct, String topKmer, long topCount, List<Stamp> stamps) {

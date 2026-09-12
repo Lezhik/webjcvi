@@ -17,6 +17,7 @@ import org.webjcvi.stamp.KmerStamp;
 import org.webjcvi.fold.PalindromeScan;
 import org.webjcvi.loop.StemLoop;
 import org.webjcvi.fuzzy.FuzzyFind;
+import org.webjcvi.logs.LogAnalysisService;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -85,6 +86,11 @@ public class WebJcviConfiguration {
     @Bean
     FuzzyFind fuzzyFind() {
         return new FuzzyFind();
+    }
+
+    @Bean
+    LogAnalysisService logAnalysisService() {
+        return new LogAnalysisService();
     }
 
     @Bean

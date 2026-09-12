@@ -48,6 +48,7 @@ class WebJcviMcpToolsTest {
                         "find_palindromes",
                         "extract_spans",
                         "fuzzy_find",
+                        "analyze_logs",
                         "list_files",
                         "read_file");
     }
@@ -193,5 +194,16 @@ class WebJcviMcpToolsTest {
         assertThat(result).contains("hallo");
         assertThat(result).doesNotContain("hidden");
         assertThat(tools.readFile("secret.txt")).isEqualTo("hello-hidden");
+    }
+
+    @Test
+    void analyzeLogsDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "hidden-log-needle");
+        String json = tools.analyzeLogs("visible ABBA (ok)");
+        assertThat(json).doesNotStartWith("Error:");
+        assertThat(json).contains("\"apiVersion\":1");
+        assertThat(json).contains("\"tape\"");
+        assertThat(json).doesNotContain("hidden-log-needle");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("hidden-log-needle");
     }
 }

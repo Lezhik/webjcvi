@@ -29,6 +29,7 @@ import org.webjcvi.loop.LoopException;
 import org.webjcvi.loop.StemLoop;
 import org.webjcvi.fuzzy.FuzzyException;
 import org.webjcvi.fuzzy.FuzzyFind;
+import org.webjcvi.logs.LogAnalysisService;
 
 /**
  * MCP tool surface. File tools go through {@link FileStorageService}. The
@@ -50,11 +51,12 @@ public class WebJcviMcpTools {
     private final PalindromeScan palindromes;
     private final StemLoop loops;
     private final FuzzyFind fuzzy;
+    private final LogAnalysisService logAnalysis;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
         this(storage, reports, new ScratchTape(), new BannerSplitter(), new PairDrift(),
                 new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer(), new KmerStamp(),
-                new PalindromeScan(), new StemLoop(), new FuzzyFind());
+                new PalindromeScan(), new StemLoop(), new FuzzyFind(), new LogAnalysisService());
     }
 
     @Autowired
@@ -70,7 +72,8 @@ public class WebJcviMcpTools {
             KmerStamp stamp,
             PalindromeScan palindromes,
             StemLoop loops,
-            FuzzyFind fuzzy) {
+            FuzzyFind fuzzy,
+            LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
@@ -83,6 +86,7 @@ public class WebJcviMcpTools {
         this.palindromes = palindromes;
         this.loops = loops;
         this.fuzzy = fuzzy;
+        this.logAnalysis = logAnalysis;
     }
 
     @Tool(name = "regenerate_dna_report", description = "Clear prior reports and rebuild the DNA report from jcvi-dna.txt and the current codebase.")
@@ -359,6 +363,12 @@ public class WebJcviMcpTools {
             }
             return out.toString();
         });
+    }
+
+    @Tool(name = "analyze_logs", description = "Analyze caller-supplied log text with the shared log-analysis facade. Returns a JSON report. Not the DNA file. Truncates at 524288 characters.")
+    public String analyzeLogs(
+            @ToolParam(description = "Log text to analyze") String text) {
+        return run(() -> logAnalysis.analyzeToJson(text));
     }
 
     @Tool(name = "list_files", description = "List files inside the project directory. Paths must be relative to the project root.")

@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Non-overlapping triplet census in the three reading phases. Island geography
@@ -16,6 +18,8 @@ public final class CodonFrameCensus {
 
     private static final String START = "ATG";
     private static final java.util.Set<String> STOPS = java.util.Set.of("TAA", "TAG", "TGA");
+
+    private static final Logger log = LoggerFactory.getLogger(CodonFrameCensus.class);
 
     private final List<Frame> frames;
     private final int bestAtgPhase;
@@ -41,6 +45,9 @@ public final class CodonFrameCensus {
 
     public static CodonFrameCensus from(DnaSequence sequence) {
         Objects.requireNonNull(sequence, "sequence");
+        if (log.isDebugEnabled()) {
+            log.debug("codon.start length={}", sequence.length());
+        }
         StringBuilder canonical = new StringBuilder();
         for (int i = 0; i < sequence.normalized().length(); i++) {
             char ch = sequence.normalized().charAt(i);
@@ -68,7 +75,11 @@ public final class CodonFrameCensus {
             }
             maxSpread = Math.max(maxSpread, frame.gcSpread());
         }
-        return new CodonFrameCensus(List.copyOf(frames), bestAtgPhase, bestStopPhase, maxAtg, maxStops, maxSpread);
+        CodonFrameCensus census = new CodonFrameCensus(List.copyOf(frames), bestAtgPhase, bestStopPhase, maxAtg, maxStops, maxSpread);
+        if (log.isDebugEnabled()) {
+            log.debug("codon.done bestAtgPhase={} maxAtg={} maxStops={}", bestAtgPhase, maxAtg, maxStops);
+        }
+        return census;
     }
 
     private static Frame countPhase(String tape, int phase) {

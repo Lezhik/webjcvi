@@ -2,6 +2,8 @@ package org.webjcvi.dna;
 
 import java.util.Locale;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Two-class islands on the linear tape: consecutive GC (minority, ~24%) versus
@@ -9,6 +11,8 @@ import java.util.Objects;
  * both classes inside a frame. This census asks how the rare class clusters.
  */
 public final class GcIslandCensus {
+
+    private static final Logger log = LoggerFactory.getLogger(GcIslandCensus.class);
 
     private final int gcIslands;
     private final int atIslands;
@@ -37,6 +41,9 @@ public final class GcIslandCensus {
 
     public static GcIslandCensus from(DnaSequence sequence) {
         Objects.requireNonNull(sequence, "sequence");
+        if (log.isDebugEnabled()) {
+            log.debug("gc-island.start length={}", sequence.length());
+        }
         String bases = sequence.normalized();
         int gcIslands = 0;
         int atIslands = 0;
@@ -82,7 +89,11 @@ public final class GcIslandCensus {
             }
             i = j;
         }
-        return new GcIslandCensus(gcIslands, atIslands, longestGc, longestAt, ge5, ge10, gcMass);
+        GcIslandCensus census = new GcIslandCensus(gcIslands, atIslands, longestGc, longestAt, ge5, ge10, gcMass);
+        if (log.isDebugEnabled()) {
+            log.debug("gc-island.done gcIslands={} atIslands={} longestGc={}", gcIslands, atIslands, longestGc);
+        }
+        return census;
     }
 
     public int gcIslands() {

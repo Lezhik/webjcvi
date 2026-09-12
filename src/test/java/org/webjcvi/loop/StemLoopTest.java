@@ -33,4 +33,17 @@ class StemLoopTest {
                 .isInstanceOf(LoopException.class)
                 .hasMessageContaining("exceeds");
     }
+
+    @Test
+    void emptyTextHasNoSpans() {
+        StemLoop.Scan scan = loops.extract("");
+        assertThat(scan.spanCount()).isZero();
+        assertThat(scan.scanned()).isZero();
+    }
+
+    @Test
+    void nullTextIsRejected() {
+        assertThatThrownBy(() -> loops.extract(null))
+                .isInstanceOf(LoopException.class);
+    }
 }

@@ -17,6 +17,8 @@ import org.webjcvi.stamp.KmerStamp;
 import org.webjcvi.fold.PalindromeScan;
 import org.webjcvi.loop.StemLoop;
 import org.webjcvi.fuzzy.FuzzyFind;
+import org.webjcvi.logs.LogAnalysisReport;
+import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.report.DnaReport;
 import org.webjcvi.report.DnaReportService;
 import org.webjcvi.segment.BannerSplitter;
@@ -46,6 +48,7 @@ public class WorkspaceApiController {
     private final PalindromeScan palindromes;
     private final StemLoop loops;
     private final FuzzyFind fuzzy;
+    private final LogAnalysisService logAnalysis;
 
     public WorkspaceApiController(
             FileStorageService storage,
@@ -59,7 +62,8 @@ public class WorkspaceApiController {
             KmerStamp stamp,
             PalindromeScan palindromes,
             StemLoop loops,
-            FuzzyFind fuzzy) {
+            FuzzyFind fuzzy,
+            LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
@@ -72,6 +76,7 @@ public class WorkspaceApiController {
         this.palindromes = palindromes;
         this.loops = loops;
         this.fuzzy = fuzzy;
+        this.logAnalysis = logAnalysis;
     }
 
     @GetMapping("/files")
@@ -392,6 +397,13 @@ public class WorkspaceApiController {
                             .toList());
                     return body;
                 })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping(value = "/logs/analyze", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Mono<LogAnalysisReport> analyzeLogs(
+            @RequestParam(name = "text", defaultValue = "") String text) {
+        return Mono.fromCallable(() -> logAnalysis.analyze(text))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 }

@@ -31,4 +31,17 @@ class KmerStampTest {
                 .isInstanceOf(StampException.class)
                 .hasMessageContaining("exceeds");
     }
+
+    @Test
+    void emptyTextHasNoStamps() {
+        KmerStamp.Census census = stamp.rank("");
+        assertThat(census.stamps()).isEmpty();
+        assertThat(census.scanned()).isZero();
+    }
+
+    @Test
+    void nullTextIsRejected() {
+        assertThatThrownBy(() -> stamp.rank(null))
+                .isInstanceOf(StampException.class);
+    }
 }

@@ -30,4 +30,17 @@ class PalindromeScanTest {
                 .isInstanceOf(FoldException.class)
                 .hasMessageContaining("exceeds");
     }
+
+    @Test
+    void emptyTextHasNoHits() {
+        PalindromeScan.Scan result = scan.find("");
+        assertThat(result.hitCount()).isZero();
+        assertThat(result.scanned()).isZero();
+    }
+
+    @Test
+    void nullTextIsRejected() {
+        assertThatThrownBy(() -> scan.find(null))
+                .isInstanceOf(FoldException.class);
+    }
 }

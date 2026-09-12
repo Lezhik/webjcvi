@@ -43,4 +43,16 @@ class WrapReflowTest {
                 .isInstanceOf(ReflowException.class)
                 .hasMessageContaining("exceeds");
     }
+
+    @Test
+    void emptyTextHasNoParagraphs() {
+        WrapReflow.Result result = reflow.unwrap("");
+        assertThat(result.paragraphCount()).isZero();
+    }
+
+    @Test
+    void nullTextIsRejected() {
+        assertThatThrownBy(() -> reflow.unwrap(null))
+                .isInstanceOf(ReflowException.class);
+    }
 }

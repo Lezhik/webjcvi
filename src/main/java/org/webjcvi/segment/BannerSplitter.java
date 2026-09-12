@@ -3,6 +3,8 @@ package org.webjcvi.segment;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.webjcvi.tape.ScratchTape;
 
 /**
@@ -20,6 +22,8 @@ public final class BannerSplitter {
     public static final int MAX_CHARS = ScratchTape.MAX_CHARS;
     public static final int MAX_SECTIONS = 80;
     public static final int PREVIEW_CHARS = 160;
+
+    private static final Logger log = LoggerFactory.getLogger(BannerSplitter.class);
 
     public List<Section> split(String text) {
         return split(text, DEFAULT_MIN_RUN);
@@ -60,12 +64,20 @@ public final class BannerSplitter {
             previousBanner = text.substring(start, start + len);
             cursor = start + len;
             if (sections.size() >= MAX_SECTIONS) {
+                if (log.isDebugEnabled()) {
+                    log.debug("banner.split minRun={} banners={} sections={} truncated=true chars={}",
+                            minRun, banners.size(), sections.size(), text.length());
+                }
                 return List.copyOf(sections);
             }
         }
         addSection(sections, text, cursor, text.length(), previousBanner);
         if (sections.isEmpty()) {
             sections.add(new Section(0, 0, text.length(), preview(text), ""));
+        }
+        if (log.isDebugEnabled()) {
+            log.debug("banner.split minRun={} banners={} sections={} chars={}",
+                    minRun, banners.size(), sections.size(), text.length());
         }
         return List.copyOf(sections);
     }

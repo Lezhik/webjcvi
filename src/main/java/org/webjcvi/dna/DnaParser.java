@@ -2,6 +2,8 @@ package org.webjcvi.dna;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Parses FASTA-like DNA without a {@code >} header. Whitespace and line
@@ -10,8 +12,13 @@ import java.util.Map;
  */
 public final class DnaParser {
 
+    private static final Logger log = LoggerFactory.getLogger(DnaParser.class);
+
     public DnaSequence parse(String rawContent) {
         String source = rawContent == null ? "" : rawContent;
+        if (log.isDebugEnabled()) {
+            log.debug("dna-parse.start chars={}", source.length());
+        }
         StringBuilder normalized = new StringBuilder(source.length());
         Map<Character, Long> canonical = zeroed(DnaSequence.CANONICAL_BASES);
         Map<Character, Long> ambiguous = new LinkedHashMap<>();
@@ -35,7 +42,12 @@ public final class DnaParser {
             }
         }
 
-        return new DnaSequence(normalized.toString(), canonical, ambiguous, invalid, lineCount);
+        DnaSequence parsed = new DnaSequence(normalized.toString(), canonical, ambiguous, invalid, lineCount);
+        if (log.isDebugEnabled()) {
+            log.debug("dna-parse.done length={} invalid={} ambiguous={}",
+                    parsed.length(), parsed.invalidTotal(), parsed.ambiguousTotal());
+        }
+        return parsed;
     }
 
     private static Map<Character, Long> zeroed(String alphabet) {

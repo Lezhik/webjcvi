@@ -1,6 +1,8 @@
 package org.webjcvi.dna;
 
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Geography of local Chargaff failure: consecutive wrap-sized windows whose
@@ -8,6 +10,8 @@ import java.util.Objects;
  * Aggregate mean/max (v3) cannot tell whether drifted frames cluster.
  */
 public final class SkewIslandCensus {
+
+    private static final Logger log = LoggerFactory.getLogger(SkewIslandCensus.class);
 
     private final int window;
     private final int windowCount;
@@ -36,9 +40,15 @@ public final class SkewIslandCensus {
 
     public static SkewIslandCensus from(DnaSequence sequence, int window) {
         Objects.requireNonNull(sequence, "sequence");
+        if (log.isDebugEnabled()) {
+            log.debug("skew-island.start length={} window={}", sequence.length(), window);
+        }
         int width = window <= 0 ? 70 : window;
         String bases = sequence.normalized();
         if (bases.isEmpty()) {
+            if (log.isDebugEnabled()) {
+                log.debug("skew-island.done empty window={}", width);
+            }
             return new SkewIslandCensus(width, 0, 0, 0, 0, 0, 0);
         }
         int windows = 0;
@@ -92,8 +102,13 @@ public final class SkewIslandCensus {
                 longestPass = Math.max(longestPass, runLen);
             }
         }
-        return new SkewIslandCensus(
+        SkewIslandCensus census = new SkewIslandCensus(
                 width, windows, failWindows, failIslands, passIslands, longestFail, longestPass);
+        if (log.isDebugEnabled()) {
+            log.debug("skew-island.done windows={} failIslands={} passIslands={}",
+                    windows, failIslands, passIslands);
+        }
+        return census;
     }
 
     private static double skew(long left, long right) {

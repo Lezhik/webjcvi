@@ -6,6 +6,8 @@ import java.util.Comparator;
 import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.webjcvi.tape.ScratchTape;
 
 /**
@@ -21,6 +23,8 @@ public final class StemLoop {
     public static final int MAX_CHARS = ScratchTape.MAX_CHARS;
     public static final int MAX_HITS = 40;
     public static final int PREVIEW_CHARS = 80;
+
+    private static final Logger log = LoggerFactory.getLogger(StemLoop.class);
 
     public Scan extract(String text) {
         return extract(text, DEFAULT_MIN_LOOP);
@@ -73,8 +77,12 @@ public final class StemLoop {
                     s.opener(), s.closer(), s.preview()));
         }
         int longestLoop = spans.isEmpty() ? 0 : spans.get(0).loopLength();
-        return new Scan(text.length(), spans.size(), nested, leftoverOpens, leftoverCloses,
+        Scan scan = new Scan(text.length(), spans.size(), nested, leftoverOpens, leftoverCloses,
                 longestLoop, List.copyOf(spans));
+        if (log.isDebugEnabled()) {
+            log.debug("loop.extract chars={} {}", text.length(), scan.summary());
+        }
+        return scan;
     }
 
     private static boolean isOpen(char ch) {

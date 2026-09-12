@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Reverse-complement hairpins with an explicit loop (gap) between the two
@@ -16,6 +18,8 @@ public final class HairpinCensus {
     public static final int MIN_STEM = 4;
     public static final int MAX_RADIUS = 200;
     public static final int[] LOOPS = {0, 1, 2, 3, 5, 8, 13};
+
+    private static final Logger log = LoggerFactory.getLogger(HairpinCensus.class);
 
     private final List<LoopRow> rows;
     private final int modalLoop;
@@ -44,6 +48,9 @@ public final class HairpinCensus {
 
     public static HairpinCensus from(DnaSequence sequence) {
         Objects.requireNonNull(sequence, "sequence");
+        if (log.isDebugEnabled()) {
+            log.debug("hairpin.start length={}", sequence.length());
+        }
         StringBuilder canonical = new StringBuilder();
         for (int i = 0; i < sequence.normalized().length(); i++) {
             char ch = sequence.normalized().charAt(i);
@@ -75,8 +82,12 @@ public final class HairpinCensus {
                 modalLoop = loop;
             }
         }
-        return new HairpinCensus(List.copyOf(rows), modalLoop, Math.max(modalHairpins, 0),
+        HairpinCensus census = new HairpinCensus(List.copyOf(rows), modalLoop, Math.max(modalHairpins, 0),
                 adjacent, gapped, longestAdjacent, longestGapped);
+        if (log.isDebugEnabled()) {
+            log.debug("hairpin.done modalLoop={} adjacent={} gapped={}", modalLoop, adjacent, gapped);
+        }
+        return census;
     }
 
     private static LoopRow countLoop(String tape, int loop) {

@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.webjcvi.tape.ScratchTape;
 
 /**
@@ -19,6 +21,8 @@ public final class PalindromeScan {
     public static final int MAX_HITS = 40;
     public static final int MAX_RADIUS = 40;
     public static final int PREVIEW_CHARS = 80;
+
+    private static final Logger log = LoggerFactory.getLogger(PalindromeScan.class);
 
     public Scan find(String text) {
         return find(text, DEFAULT_MIN);
@@ -62,7 +66,11 @@ public final class PalindromeScan {
             }
         }
         int longest = hits.isEmpty() ? 0 : hits.get(0).length();
-        return new Scan(folded.length(), hits.size(), longest, List.copyOf(hits));
+        Scan scan = new Scan(folded.length(), hits.size(), longest, List.copyOf(hits));
+        if (log.isDebugEnabled()) {
+            log.debug("palindrome.find chars={} {}", text.length(), scan.summary());
+        }
+        return scan;
     }
 
     private static void expandEven(String folded, int leftOfCenter, int floor, List<Hit> hits) {

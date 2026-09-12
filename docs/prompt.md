@@ -42,6 +42,16 @@ Pay special attention to the following requirements for this iteration:
    docs/log.md and confirm your hypothesis is meaningfully different from
    every previous one.
 
+5. Before Pros/Cons, run the full automated test suite so DEBUG logs are
+   written to reports/logs/test.log. Then call the log-analysis facade on
+   that journal and write reports/logs/report.json (Gradle analyzeLogs).
+   Do not skip this even if the journal looks empty.
+
+6. Read reports/logs/report.json before writing Pros and Cons. Any claim
+   about whether the hypothesis is useful for log analysis must be grounded
+   in that JSON (what the algorithms actually found in the app's own logs),
+   not in speculation. Record that grounding in the Pros/Cons fields.
+
 Record the iteration in docs/log.md using exactly the required format
 (Hypothesis / Functionality changes / Pros / Cons / Report builder changes),
 making sure the "Pros"/"Cons" and "Hypothesis" fields carry the DNA-to-

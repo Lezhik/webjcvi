@@ -47,4 +47,19 @@ class ScratchTapeTest {
         assertThatThrownBy(() -> tape.load(huge))
                 .isInstanceOf(TapeException.class);
     }
+
+    @Test
+    void emptyLoadIsAllowedAndClearResets() {
+        tape.load("");
+        assertThat(tape.isEmpty()).isTrue();
+        tape.load("abc");
+        tape.clear();
+        assertThat(tape.length()).isZero();
+    }
+
+    @Test
+    void nullLoadIsRejected() {
+        assertThatThrownBy(() -> tape.load(null))
+                .isInstanceOf(TapeException.class);
+    }
 }

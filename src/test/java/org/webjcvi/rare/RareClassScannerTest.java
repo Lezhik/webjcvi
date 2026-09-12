@@ -32,4 +32,17 @@ class RareClassScannerTest {
                 .isInstanceOf(RareException.class)
                 .hasMessageContaining("exceeds");
     }
+
+    @Test
+    void emptyTextHasNoIslands() {
+        RareClassScanner.Scan scan = scanner.scan("");
+        assertThat(scan.islandCount()).isZero();
+        assertThat(scan.scanned()).isZero();
+    }
+
+    @Test
+    void nullTextIsRejected() {
+        assertThatThrownBy(() -> scanner.scan(null))
+                .isInstanceOf(RareException.class);
+    }
 }

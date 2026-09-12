@@ -528,4 +528,27 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("distance");
                 });
     }
+
+    @Test
+    void logsAnalyzeApiReturnsFixedJsonContract() {
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/logs/analyze")
+                        .queryParam("text", "ERROR hello ABBA (loop)")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.apiVersion").isEqualTo(1)
+                .jsonPath("$.truncated").isEqualTo(false)
+                .jsonPath("$.tape.length").isNumber()
+                .jsonPath("$.banners.sectionCount").isNumber()
+                .jsonPath("$.drift.windowCount").isNumber()
+                .jsonPath("$.reflow.paragraphCount").isNumber()
+                .jsonPath("$.rare.islandCount").isNumber()
+                .jsonPath("$.tokens.tokenCount").isNumber()
+                .jsonPath("$.stamps.k").isNumber()
+                .jsonPath("$.palindromes.hitCount").isNumber()
+                .jsonPath("$.spans.spanCount").isNumber()
+                .jsonPath("$.fuzzy.skipped").isBoolean();
+    }
 }

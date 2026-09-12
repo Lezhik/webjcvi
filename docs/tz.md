@@ -46,19 +46,23 @@ exists to decrypt it incrementally:
   ___, and if so, the system should be able to do ___."
 - The hypothesis is tested by actually **building** the functionality it implies (on the web
   UI, the MCP server, or both).
-- The resulting functionality is then judged on its own merits: **is it actually useful**,
+- The application **writes DEBUG logs** while its algorithms run (especially during the
+  automated test suite). Those logs are then **analyzed by the log-analysis facade**
+  (Section 5.6). Usefulness of the current hypothesis for **log analysis** is judged from
+  that JSON report (`reports/logs/report.json`), not from speculation about what the tools
+  might do.
+- The resulting functionality is also judged on its own merits: **is it actually useful**,
   as a general-purpose capability, independent of the fact that it came from a DNA file or
-  that this is a research project? Usefulness here means the kind of thing a person or
-  another piece of software would genuinely want — not "interesting because it's DNA-driven."
-- Every hypothesis has pros and cons as a decryption of the DNA (does it explain more of the
-  sequence's structure? does it produce something coherent and useful, or something
-  arbitrary and forced?). These are captured explicitly every iteration.
+  that this is a research project?
+- Every hypothesis has pros and cons as a decryption of the DNA. **Pros and cons that
+  concern log analysis must be derived from the log-analysis report** produced in
+  Section 6.8, after the test journal exists. These are captured explicitly every iteration.
 - The **DNA report builder itself is part of what evolves**. Each iteration produces a new
   version of the report-building logic, informed by the current hypothesis's pros and cons,
   intended to surface whatever information would help resolve the contradictions found so
   far. A report builder version must be meaningfully different from every previous version —
   not a cosmetic tweak — because it represents a genuinely different angle of attack on
-  decrypting the same DNA.
+  decrypting the same DNA (see Section 6.10).
 - **Hypotheses must not repeat.** Before proposing a new hypothesis, the agent must check
   prior hypotheses recorded in `docs/log.md` and ensure the new one is meaningfully distinct
   — a different theory of what the DNA encodes, not a restatement or minor variant of one
@@ -91,7 +95,7 @@ exists to decrypt it incrementally:
 - **Build tool:** Gradle with the Kotlin DSL (`build.gradle.kts`), single module for now,
   with the codebase organized into growing sub-packages (`dna`, `report`, `storage`, `web`,
   etc.). If/when the project genuinely outgrows a single module (per the module-splitting
-  rule in Section 6.12), it should be migrated to a Gradle multi-module (multi-project)
+  rule in Section 6.14), it should be migrated to a Gradle multi-module (multi-project)
   layout at that point — this is not required from day one.
 - **Version control:** Git, local commits only (no `push` as part of the automated flow)
 
@@ -145,21 +149,24 @@ exists to decrypt it incrementally:
   - Each new version of the report builder must be **meaningfully different from previous
     versions**, not a cosmetic adjustment — it should represent a genuinely different
     approach to extracting signal from the DNA, chosen to resolve the specific
-    contradictions/cons identified for the current hypothesis (see Section 6.8).
+    contradictions/cons identified for the current hypothesis (see Section 6.10).
   - The DNA reader/report builder must be re-invokable at will (idempotent): every
     iteration starts by regenerating the report from scratch based on current DNA + current
     codebase state.
 
 ### 5.3 Report lifecycle
 
-- Reports are generated into `build/reports/` (or a module-specific subfolder once module
-  splitting begins — see 6.12).
-- `build/reports/` is **excluded from Git** (must be in `.gitignore`).
+- DNA reports are generated into `build/reports/` (or a module-specific subfolder once
+  module splitting begins — see 6.14).
+- Log-analysis artifacts live under `reports/logs/` (Section 5.6): the test DEBUG
+  journal (`test.log`) and the JSON analysis (`report.json`).
+- `build/reports/` and `reports/` are **excluded from Git** (must be in `.gitignore`).
+  Never commit generated DNA reports, test journals, or log-analysis JSON.
 - At the start of the **preparation phase** (initial setup, before the iteration loop
   begins), a "DNA decoder" step must:
   1. Delete any pre-existing reports in `build/reports/`, if present
   2. Read the DNA file
-  3. Generate a fresh report (using the initial report builder — see Section 6.8 for how it
+  3. Generate a fresh report (using the initial report builder — see Section 6.10 for how it
      evolves from there)
 - The same regeneration must happen as **step 1 of every iteration** (Section 6.1) — the
   report always reflects the current state of the DNA and the code generated in the
@@ -181,6 +188,12 @@ The project must include automated tests covering at minimum:
   - Report generation runs end-to-end without error and produces output in
     `build/reports/`
   - Report regeneration correctly clears/replaces prior reports
+  - Every text-processing algorithm used for log analysis (tape, banner split, pair-drift,
+    unwrap, rare islands, tokens, k-mer stamps, palindromes, stem loops, fuzzy find) has
+    unit tests covering its functional behavior (typical input, empty/malformed input,
+    size limit)
+  - The log-analysis facade (Section 5.6) has contract tests that lock the analyze-to-JSON
+    API (required keys, types, `apiVersion`)
 - **Limits/edge cases:**
   - Empty DNA file
   - Malformed DNA file (non-nucleotide content)
@@ -205,6 +218,44 @@ The project must include automated tests covering at minimum:
 - Automated tests (5.4) apply equally to the MCP surface: sandboxing and size-limit
   enforcement must be verified through the MCP tools too, not only through the web/HTTP path.
 
+### 5.6 Log-analysis facade
+
+- **One class with a fixed API** is responsible for analyzing caller-supplied log text by
+  running the existing text-processing algorithms (not a parallel implementation). Input is
+  a single `String` (the log body). Output is a structured JSON report. The Java method
+  signatures must stay stable: `analyze(String text)` returns a structured report object,
+  and `analyzeToJson(String text)` returns that report as JSON. Automated tests must fail
+  if required JSON keys are removed or renamed, or if those method signatures change.
+- Default relative paths (project-root sandbox, via the storage service when reading or
+  writing files):
+  - Test DEBUG journal: `reports/logs/test.log`
+  - Log-analysis JSON: `reports/logs/report.json`
+- `reports/logs/` is **excluded from Git**. Never commit generated journals or JSON
+  reports.
+- The facade must not read `jcvi-dna.txt` and must not touch the filesystem itself. Callers
+  that persist `report.json` or read `test.log` go through `FileStorageService`.
+- The test DEBUG journal itself is written by the logging framework (Logback) during
+  Gradle tests, not by application code calling `java.nio.file.Files`.
+- Algorithm DEBUG logs (Section 5.7) are the preferred input during an iteration: the test
+  suite writes `test.log`, then the facade analyzes that journal.
+- Expose the same facade on the web API and the MCP server so both surfaces can analyze
+  caller-supplied log text without duplicating the analysis logic.
+
+### 5.7 Algorithm DEBUG logging
+
+- Every text-processing algorithm must emit **DEBUG**-level diagnostic logs describing
+  inputs, counts, and outcomes that matter for log analysis.
+- Every log call must be wrapped so the message is not built when DEBUG is off:
+
+```
+if (log.isDebugEnabled()) {
+    log.debug(...);
+}
+```
+
+- The Gradle test task used before pros/cons (Section 6.7) must enable DEBUG for
+  `org.webjcvi` and persist the journal at `reports/logs/test.log`.
+
 ## 6. Iteration Algorithm
 
 Each iteration, performed in order by the operator/agent via Cursor. This algorithm exists to
@@ -215,7 +266,7 @@ method of this project.
 ### 6.1 Regenerate the DNA report
 Invoke the fixed-API DNA reader/report class to rebuild the report, using **the report
 builder version currently in place** (i.e., the one produced at the end of the previous
-iteration's Section 6.8), based on the DNA file and the code as it exists after the previous
+iteration's Section 6.10), based on the DNA file and the code as it exists after the previous
 iteration.
 
 ### 6.2 Read the spec
@@ -248,19 +299,38 @@ Step back and evaluate the functionality you just built **on its own merits** �
 didn't know it came from a DNA file or that this is a research project. Would a person or
 another piece of software genuinely want this capability? Is it coherent, or does it feel
 arbitrary/forced? Record this assessment honestly, including if the answer is "not very
-useful" — that's a legitimate and important outcome, not a failure to hide.
+useful" — that's a legitimate and important outcome, not a failure to hide. This is the
+code-level judgment. **Log-analysis usefulness is judged later, from the JSON report in
+Section 6.9**, not guessed here.
 
-### 6.7 Determine the pros and cons of the current DNA decryption
-Using the analysis from 6.6 together with the hypothesis from 6.4, list concrete pros and
-cons of treating the DNA this way:
+### 6.7 Run the automated tests and keep the DEBUG journal
+Run the **full** automated test suite. Tests must stay green (Section 5.4). The Gradle
+test task must enable DEBUG for `org.webjcvi` and persist the journal at
+`reports/logs/test.log` (Section 5.7), replacing any previous journal for this run.
+Every text-processing algorithm must emit DEBUG logs during this run.
+
+### 6.8 Analyze the test journal
+After the DNA report exists (6.1) and the test journal exists (6.7), **and before
+pros/cons**, call the log-analysis facade (Section 5.6) on the journal text. Persist
+the JSON output to `reports/logs/report.json` through `FileStorageService` (for example
+via the `analyzeLogs` Gradle task). Do not skip this step even if the journal is empty.
+
+### 6.9 Determine the pros and cons of the current DNA decryption
+**Read `reports/logs/report.json`.** Pros and cons of the hypothesis as a log-analysis
+system must be formed from that report (counts, sections, truncation, what the algorithms
+actually found in the app's own DEBUG journal), together with the hypothesis from 6.4 and
+the code analysis from 6.6:
 - **Pros:** what does this hypothesis explain well? What structure in the DNA does it
-  account for? What useful functionality did it produce?
+  account for? What does the log-analysis JSON show the tools actually extracted from
+  the journal?
 - **Cons:** what does it fail to explain? Where does the mapping from DNA to functionality
-  feel forced or arbitrary? What did the usefulness analysis in 6.6 reveal as weak or
-  missing?
+  feel forced? What does the log-analysis JSON show as weak, empty, truncated, or
+  uninformative?
 
-### 6.8 Build a new DNA report builder
-Based on the pros and cons from 6.7, design and implement a **new version of the DNA report
+Do not invent log-analysis pros/cons that are not grounded in `report.json`.
+
+### 6.10 Build a new DNA report builder
+Based on the pros and cons from 6.9, design and implement a **new version of the DNA report
 builder** (Section 5.2) intended to help resolve the contradictions/cons just identified —
 e.g., by surfacing different structural signals from the DNA, or presenting the existing
 signals in a way that makes the next hypothesis easier to form or test. This new version
@@ -268,31 +338,32 @@ must be **meaningfully different from every previous report builder version** �
 angle on the same DNA, not a cosmetic edit. This becomes the report builder used in the
 *next* iteration's Section 6.1.
 
-### 6.9 Record the decision
+### 6.11 Record the decision
 Append an entry to `docs/log.md` for this iteration, using exactly this structure:
 
 ```
 ## Iteration #<index>
 - **Hypothesis:** <the hypothesis formed in 6.4>
 - **Functionality changes:** <what was built/changed in 6.5, and on which surface(s)>
-- **Pros:** <pros of this hypothesis, from 6.7>
-- **Cons:** <cons of this hypothesis, from 6.7>
-- **Report builder changes:** <what changed in the new report builder version from 6.8,
+- **Pros:** <pros of this hypothesis, from 6.9, grounded in reports/logs/report.json>
+- **Cons:** <cons of this hypothesis, from 6.9, grounded in reports/logs/report.json>
+- **Report builder changes:** <what changed in the new report builder version from 6.10,
   and how it addresses the cons above>
 ```
 
-### 6.10 Commit
+### 6.12 Commit
 Commit the change to Git (**no push**). Commit message format:
 
 ```
 Iteration #<index> - <brief description>
 ```
 
-### 6.11 Report to the operator
+### 6.13 Report to the operator
 Output a summary message describing what was done this iteration: the hypothesis tried, what
-was built, the pros/cons found, and how the report builder changed for next time.
+was built, the pros/cons found (from the log-analysis report), and how the report builder
+changed for next time.
 
-### 6.12 Module growth
+### 6.14 Module growth
 As the application grows, it may be split into modules and sub-modules. When this happens:
 - Each module/sub-module gets **its own DNA-derived report**, **its own hypothesis
   track**, and **its own patch/iteration history** going forward, scoped to that module
@@ -309,11 +380,13 @@ As the application grows, it may be split into modules and sub-modules. When thi
 ├── docs/
 │   ├── tz.md              this specification
 │   └── log.md             iteration decision log (append-only)
+├── reports/
+│   └── logs/              test DEBUG journal + log-analysis JSON (git-ignored)
 ├── build/
-│   └── reports/           generated reports (git-ignored)
+│   └── reports/           generated DNA reports (git-ignored)
 ├── src/
-│   └── main/java/...      application code (dna / report / storage / web / mcp packages)
-├── .gitignore             must exclude build/reports/
+│   └── main/java/...      application code (dna / report / storage / web / mcp / logs)
+├── .gitignore             must exclude build/reports/ and reports/
 ├── build.gradle.kts
 └── settings.gradle.kts
 ```
@@ -323,7 +396,7 @@ As the application grows, it may be split into modules and sub-modules. When thi
 - **What the DNA actually encodes** is unknown by design (Section 1.1) — this is not a gap
   to fill in this document, it's the thing the iteration loop exists to discover.
 - **DNA-to-code mapping logic** is intentionally left undefined here — decided fresh each
-  iteration via the hypothesis process in Section 6.4–6.8, not specified as a fixed
+  iteration via the hypothesis process in Section 6.4–6.10, not specified as a fixed
   algorithm.
 - **Report content/format** is intentionally left open-ended per Section 5.2 — expected to
   change meaningfully every iteration as new report builder versions are produced.
@@ -333,6 +406,6 @@ As the application grows, it may be split into modules and sub-modules. When thi
   recorded in `docs/log.md` when the first MCP-related iteration happens.
 - **No convergence criterion is defined** for when a hypothesis is "confirmed" — the process
   is exploratory; hypotheses may be abandoned, revisited in modified form, or several may
-  turn out to coexist as different modules (Section 6.12) once the project splits.
+  turn out to coexist as different modules (Section 6.14) once the project splits.
 - **Stopping condition** for the overall iterative growth process is not defined — the
   process continues for as long as the operator chooses to run further iterations.

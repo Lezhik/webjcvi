@@ -2,6 +2,8 @@ package org.webjcvi.dna;
 
 import java.util.Locale;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Chargaff skew in wrap-sized windows. Global A≈T can hide local imbalance;
@@ -10,6 +12,8 @@ import java.util.Objects;
 public final class FrameSkewCensus {
 
     public static final double LOCAL_THRESHOLD = 0.05;
+
+    private static final Logger log = LoggerFactory.getLogger(FrameSkewCensus.class);
 
     private final int window;
     private final int windowCount;
@@ -38,9 +42,15 @@ public final class FrameSkewCensus {
 
     public static FrameSkewCensus from(DnaSequence sequence, int window) {
         Objects.requireNonNull(sequence, "sequence");
+        if (log.isDebugEnabled()) {
+            log.debug("frame-skew.start length={} window={}", sequence.length(), window);
+        }
         int width = window <= 0 ? 70 : window;
         String bases = sequence.normalized();
         if (bases.isEmpty()) {
+            if (log.isDebugEnabled()) {
+                log.debug("frame-skew.done empty window={}", width);
+            }
             return new FrameSkewCensus(width, 0, 0, 0, 0, 0, 0);
         }
         double atAbsSum = 0;
@@ -78,7 +88,11 @@ public final class FrameSkewCensus {
         }
         double meanAt = count == 0 ? 0.0 : atAbsSum / count;
         double meanGc = count == 0 ? 0.0 : gcAbsSum / count;
-        return new FrameSkewCensus(width, count, meanAt, meanGc, maxAt, maxGc, past);
+        FrameSkewCensus census = new FrameSkewCensus(width, count, meanAt, meanGc, maxAt, maxGc, past);
+        if (log.isDebugEnabled()) {
+            log.debug("frame-skew.done windows={} pastThreshold={}", count, past);
+        }
+        return census;
     }
 
     private static double skew(long left, long right) {

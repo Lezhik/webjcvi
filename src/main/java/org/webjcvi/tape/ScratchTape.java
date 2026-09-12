@@ -3,6 +3,8 @@ package org.webjcvi.tape;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * In-process working tape for caller-supplied text. Not the DNA file and not
@@ -19,6 +21,8 @@ public final class ScratchTape {
     public static final int DEFAULT_MAX_HITS = 40;
     public static final int SNIPPET_CHARS = 120;
 
+    private static final Logger log = LoggerFactory.getLogger(ScratchTape.class);
+
     private String original = "";
     private String folded = "";
 
@@ -31,11 +35,17 @@ public final class ScratchTape {
         }
         this.original = text;
         this.folded = foldPreserve(text);
+        if (log.isDebugEnabled()) {
+            log.debug("tape.load chars={}", text.length());
+        }
     }
 
     public synchronized void clear() {
         original = "";
         folded = "";
+        if (log.isDebugEnabled()) {
+            log.debug("tape.clear");
+        }
     }
 
     public synchronized int length() {
@@ -78,6 +88,9 @@ public final class ScratchTape {
             hits.add(new Hit(at, lineNumber(original, at), snippet(original, at, needle.length())));
             from = at + Math.max(1, needle.length());
         }
+        if (log.isDebugEnabled()) {
+            log.debug("tape.find motifChars={} maxHits={} hits={}", needle.length(), maxHits, hits.size());
+        }
         return List.copyOf(hits);
     }
 
@@ -100,10 +113,17 @@ public final class ScratchTape {
             if (len >= minLength) {
                 found.add(new Run(ch, i, len));
                 if (found.size() >= limit) {
+                    if (log.isDebugEnabled()) {
+                        log.debug("tape.runs minLength={} limit={} runCount={} truncated=true",
+                                minLength, limit, found.size());
+                    }
                     return List.copyOf(found);
                 }
             }
             i = j;
+        }
+        if (log.isDebugEnabled()) {
+            log.debug("tape.runs minLength={} limit={} runCount={}", minLength, limit, found.size());
         }
         return List.copyOf(found);
     }

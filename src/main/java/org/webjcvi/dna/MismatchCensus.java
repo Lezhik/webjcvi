@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Hamming distance of a left 4-mer to the reverse-complement of the adjacent
@@ -14,6 +16,8 @@ import java.util.Objects;
 public final class MismatchCensus {
 
     public static final int PAIRS = 4;
+
+    private static final Logger log = LoggerFactory.getLogger(MismatchCensus.class);
 
     private final int windows;
     private final List<DistanceRow> rows;
@@ -42,6 +46,9 @@ public final class MismatchCensus {
 
     public static MismatchCensus from(DnaSequence sequence) {
         Objects.requireNonNull(sequence, "sequence");
+        if (log.isDebugEnabled()) {
+            log.debug("mismatch.start length={}", sequence.length());
+        }
         StringBuilder canonical = new StringBuilder();
         for (int i = 0; i < sequence.normalized().length(); i++) {
             char ch = sequence.normalized().charAt(i);
@@ -93,8 +100,13 @@ public final class MismatchCensus {
             double enrichment = expected == 0.0 ? 0.0 : counts[d] / expected;
             rows.add(new DistanceRow(d, counts[d], share, expected, enrichment));
         }
-        return new MismatchCensus(windows, List.copyOf(rows), modal, pairChance,
+        MismatchCensus census = new MismatchCensus(windows, List.copyOf(rows), modal, pairChance,
                 zeroShare, zeroExpected, zeroEnrichment);
+        if (log.isDebugEnabled()) {
+            log.debug("mismatch.done windows={} modalDistance={} zeroEnrichment={}",
+                    windows, modal, zeroEnrichment);
+        }
+        return census;
     }
 
     private static char complement(char ch) {

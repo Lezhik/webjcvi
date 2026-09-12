@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Same-base match rate at selected lags versus the independence baseline
@@ -13,6 +15,8 @@ import java.util.Objects;
 public final class SameBaseLagCensus {
 
     public static final int[] LAGS = {1, 2, 3, 10, 70};
+
+    private static final Logger log = LoggerFactory.getLogger(SameBaseLagCensus.class);
 
     private final double independent;
     private final List<Lag> lags;
@@ -28,6 +32,9 @@ public final class SameBaseLagCensus {
 
     public static SameBaseLagCensus from(DnaSequence sequence) {
         Objects.requireNonNull(sequence, "sequence");
+        if (log.isDebugEnabled()) {
+            log.debug("same-base-lag.start length={}", sequence.length());
+        }
         StringBuilder canonical = new StringBuilder();
         for (int i = 0; i < sequence.normalized().length(); i++) {
             char ch = sequence.normalized().charAt(i);
@@ -72,7 +79,11 @@ public final class SameBaseLagCensus {
                 peakLag = lag;
             }
         }
-        return new SameBaseLagCensus(independent, List.copyOf(lags), peakLag, peakEnrichment);
+        SameBaseLagCensus census = new SameBaseLagCensus(independent, List.copyOf(lags), peakLag, peakEnrichment);
+        if (log.isDebugEnabled()) {
+            log.debug("same-base-lag.done peakLag={} peakEnrichment={}", peakLag, peakEnrichment);
+        }
+        return census;
     }
 
     private static int index(char ch) {
