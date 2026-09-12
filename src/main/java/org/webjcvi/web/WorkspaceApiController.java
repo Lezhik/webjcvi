@@ -21,6 +21,7 @@ import org.webjcvi.contrast.BlockContrast;
 import org.webjcvi.mirror.MirrorJoint;
 import org.webjcvi.seam.SeamGuard;
 import org.webjcvi.phase.PhaseJoint;
+import org.webjcvi.frame.FrameFields;
 import org.webjcvi.logs.LogAnalysisReport;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.report.DnaReport;
@@ -56,6 +57,7 @@ public class WorkspaceApiController {
     private final MirrorJoint mirrors;
     private final SeamGuard seams;
     private final PhaseJoint phase;
+    private final FrameFields fields;
     private final LogAnalysisService logAnalysis;
 
     public WorkspaceApiController(
@@ -75,6 +77,7 @@ public class WorkspaceApiController {
             MirrorJoint mirrors,
             SeamGuard seams,
             PhaseJoint phase,
+            FrameFields fields,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -92,6 +95,7 @@ public class WorkspaceApiController {
         this.mirrors = mirrors;
         this.seams = seams;
         this.phase = phase;
+        this.fields = fields;
         this.logAnalysis = logAnalysis;
     }
 
@@ -523,6 +527,34 @@ public class WorkspaceApiController {
                                 row.put("left", hit.left());
                                 row.put("right", hit.right());
                                 return row;
+                            })
+                            .toList());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/fields")
+    public Mono<Map<String, Object>> extractFields(
+            @RequestParam("text") String text,
+            @RequestParam(name = "wrap", defaultValue = "70") int wrapWidth) {
+        return Mono.fromCallable(() -> {
+                    var scan = fields.extract(text, wrapWidth);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("wrapWidth", scan.wrapWidth());
+                    body.put("recordCount", scan.recordCount());
+                    body.put("topRc", scan.topRc());
+                    body.put("topReverse", scan.topReverse());
+                    body.put("topIdentity", scan.topIdentity());
+                    body.put("records", scan.records().stream()
+                            .map(row -> {
+                                Map<String, Object> rec = new LinkedHashMap<>();
+                                rec.put("index", row.index());
+                                rec.put("offset", row.offset());
+                                rec.put("rc", row.rc());
+                                rec.put("reverse", row.reverse());
+                                rec.put("identity", row.identity());
+                                return rec;
                             })
                             .toList());
                     return body;

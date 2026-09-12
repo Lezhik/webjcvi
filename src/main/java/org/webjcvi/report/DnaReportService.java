@@ -29,6 +29,7 @@ import org.webjcvi.dna.WrapJointCensus;
 import org.webjcvi.dna.WrapReverseCensus;
 import org.webjcvi.dna.ReversePhaseCensus;
 import org.webjcvi.dna.MapPhaseCensus;
+import org.webjcvi.dna.SlotCensus;
 import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.storage.StorageNotFoundException;
 import org.slf4j.Logger;
@@ -119,10 +120,11 @@ public final class DnaReportService {
         WrapReverseCensus wrapReverse = WrapReverseCensus.from(raw, neighbors);
         ReversePhaseCensus phases = ReversePhaseCensus.from(sequence, wraps.modalWidth());
         MapPhaseCensus mapPhases = MapPhaseCensus.from(sequence, wraps.modalWidth());
+        SlotCensus slots = SlotCensus.from(sequence, wraps.modalWidth());
         Map<String, String> sections = buildSections(
-                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases);
+                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots);
         String markdown = renderMarkdown(
-                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases);
+                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots);
         storage.writeText(reportRelativePath(), markdown);
         if (log.isDebugEnabled()) {
             log.debug("dna-report.regenerate.done bases={} markdownChars={} path={}",
@@ -184,7 +186,8 @@ public final class DnaReportService {
             NeighborCensus neighbors,
             WrapReverseCensus wrapReverse,
             ReversePhaseCensus phases,
-            MapPhaseCensus mapPhases) {
+            MapPhaseCensus mapPhases,
+            SlotCensus slots) {
         Map<String, String> sections = new LinkedHashMap<>();
         sections.put("meta", "generatedAt=" + ISO.format(generatedAt));
         sections.put("length", Integer.toString(sequence.length()));
@@ -193,10 +196,13 @@ public final class DnaReportService {
         sections.put("invalidTotal", Long.toString(sequence.invalidTotal()));
         sections.put("javaSourceCount", Integer.toString(javaSources.size()));
         sections.put("wrapModalWidth", Integer.toString(wraps.modalWidth()));
-        sections.put("identityPeakPhase", Integer.toString(mapPhases.identity().peakPhase()));
-        sections.put("reversePeakPhase", Integer.toString(mapPhases.reverse().peakPhase()));
-        sections.put("rcPeakPhase", Integer.toString(mapPhases.rc().peakPhase()));
-        sections.put("reversePeakShare", String.format(Locale.ROOT, "%.4f", mapPhases.reverse().peakShare()));
+        sections.put("slotFrames", Integer.toString(slots.frames()));
+        sections.put("rcGc", String.format(Locale.ROOT, "%.2f", slots.rc().gcPercent()));
+        sections.put("reverseGc", String.format(Locale.ROOT, "%.2f", slots.reverse().gcPercent()));
+        sections.put("identityGc", String.format(Locale.ROOT, "%.2f", slots.identity().gcPercent()));
+        sections.put("rcTop", slots.rc().topKmer());
+        sections.put("reverseTop", slots.reverse().topKmer());
+        sections.put("identityTop", slots.identity().topKmer());
         sections.put("longestHomopolymer", runs.longestBase() + "x" + runs.longestLength());
         return sections;
     }
@@ -221,16 +227,18 @@ public final class DnaReportService {
             NeighborCensus neighbors,
             WrapReverseCensus wrapReverse,
             ReversePhaseCensus phases,
-            MapPhaseCensus mapPhases) {
+            MapPhaseCensus mapPhases,
+            SlotCensus slots) {
         StringBuilder md = new StringBuilder();
         md.append("# WebJCVI DNA Report\n\n");
         md.append("Generated at **").append(ISO.format(generatedAt.atOffset(ZoneOffset.UTC))).append("**.\n\n");
         md.append("This report is rebuilt from `").append(dnaRelativePath)
-                .append("` and a snapshot of the current codebase. Version 15 of the builder ")
-                .append("finds the wrap-frame phase where identity, reverse, and RC distance-0 ")
-                .append("each peak. v14 reverse peaked at column 19; this asks whether that ")
-                .append("column is reverse-specific or the same phase wins for every neighbor ")
-                .append("map (a compositional artifact).\n\n");
+                .append("` and a snapshot of the current codebase. Version 16 of the builder ")
+                .append("reads the three wrap-frame slots that v15 assigned to different neighbor ")
+                .append("maps (RC column 4, reverse 19, identity 58) as typed 8-mer fields: GC% ")
+                .append("and the mode 8-mer of each slot. If the three fields differ, the wrap ")
+                .append("frame is a record; if they share AT background, the peak columns are ")
+                .append("sampling noise.\n\n");
 
         md.append("## Sequence composition\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
@@ -271,30 +279,35 @@ public final class DnaReportService {
         md.append("First ").append(PREVIEW_BASES).append(" normalized bases:\n\n```\n");
         md.append(sequence.preview(PREVIEW_BASES)).append("\n```\n\n");
 
-        md.append("## Map phase\n\n");
-        md.append("Overlapping adjacent 4-mers binned by start offset modulo wrap width **")
-                .append(mapPhases.wrapWidth())
-                .append("**. Each neighbor map reports the phase with the highest distance-0 ")
-                .append("share. If reverse's peak phase differs from identity and RC, column ")
-                .append(mapPhases.reverse().peakPhase())
-                .append(" is a reverse field; if all three share a phase, it is composition.\n\n");
-        md.append("| Map | Peak phase | Peak distance-0 share | Peak count |\n");
-        md.append("| --- | --- | --- | --- |\n");
-        for (var row : mapPhases.maps()) {
-            md.append("| ").append(row.mode()).append(" | ")
-                    .append(row.peakPhase()).append(" | ")
-                    .append(String.format(Locale.ROOT, "%.4f", row.peakShare())).append(" | ")
-                    .append(row.peakZero()).append(" |\n");
-        }
+        md.append("## Slot composition\n\n");
+        md.append("Non-overlapping wrap frames of width **").append(slots.wrapWidth())
+                .append("**. Each frame contributes an 8-mer at the v15 peak columns ")
+                .append("(RC **").append(SlotCensus.RC_COLUMN)
+                .append("**, reverse **").append(SlotCensus.REVERSE_COLUMN)
+                .append("**, identity **").append(SlotCensus.IDENTITY_COLUMN)
+                .append("**). GC% and the mode 8-mer ask whether those fields have distinct ")
+                .append("alphabets or are the same AT background sampled three times.\n\n");
+        md.append("| Slot | Column | Frames | GC% | Top 8-mer | Count |\n");
+        md.append("| --- | --- | --- | --- | --- | --- |\n");
+        appendSlotRow(md, slots.rc(), SlotCensus.RC_COLUMN);
+        appendSlotRow(md, slots.reverse(), SlotCensus.REVERSE_COLUMN);
+        appendSlotRow(md, slots.identity(), SlotCensus.IDENTITY_COLUMN);
         md.append("\n| Metric | Value |\n| --- | --- |\n");
-        md.append("| Windows | ").append(mapPhases.windows()).append(" |\n");
-        md.append("| Reverse peak phase | ").append(mapPhases.reverse().peakPhase()).append(" |\n");
-        md.append("| Identity peak phase | ").append(mapPhases.identity().peakPhase()).append(" |\n");
-        md.append("| RC peak phase | ").append(mapPhases.rc().peakPhase()).append(" |\n\n");
-        md.append("`").append(mapPhases.toTextRow()).append("`\n\n");
+        md.append("| Frames | ").append(slots.frames()).append(" |\n");
+        md.append("| Wrap | ").append(slots.wrapWidth()).append(" |\n\n");
+        md.append("`").append(slots.toTextRow()).append("`\n\n");
 
         md.append("## Frame remainder\n\n");
-        md.append("Reverse-only phase: peak **").append(phases.peakPhase())
+        md.append("Map-phase remainder: identity peaks at **").append(mapPhases.identity().peakPhase())
+                .append("** (share **")
+                .append(String.format(Locale.ROOT, "%.4f", mapPhases.identity().peakShare()))
+                .append("**); reverse at **").append(mapPhases.reverse().peakPhase())
+                .append("** (share **")
+                .append(String.format(Locale.ROOT, "%.4f", mapPhases.reverse().peakShare()))
+                .append("**); RC at **").append(mapPhases.rc().peakPhase())
+                .append("** (share **")
+                .append(String.format(Locale.ROOT, "%.4f", mapPhases.rc().peakShare()))
+                .append("**). Reverse-only phase: peak **").append(phases.peakPhase())
                 .append("** share **")
                 .append(String.format(Locale.ROOT, "%.4f", phases.peakShare()))
                 .append("**; wrap phase **").append(phases.wrapPhase())
@@ -332,7 +345,7 @@ public final class DnaReportService {
                 .append("**.\n\n");
 
         md.append("## Extracted tape rules\n\n");
-        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases);
+        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots);
 
         md.append("## Codebase snapshot\n\n");
         md.append(javaSources.size()).append(" Java source files under `src/main/java`:\n\n");
@@ -347,17 +360,17 @@ public final class DnaReportService {
 
         md.append("## Growth notes for the next iteration\n\n");
         md.append("- Dominant canonical base: **").append(dominantBase(sequence)).append("**.\n");
-        md.append("- Map phase: identity peaks at **").append(mapPhases.identity().peakPhase())
-                .append("** (share **")
-                .append(String.format(Locale.ROOT, "%.4f", mapPhases.identity().peakShare()))
-                .append("**); reverse at **").append(mapPhases.reverse().peakPhase())
-                .append("** (share **")
-                .append(String.format(Locale.ROOT, "%.4f", mapPhases.reverse().peakShare()))
-                .append("**); RC at **").append(mapPhases.rc().peakPhase())
-                .append("** (share **")
-                .append(String.format(Locale.ROOT, "%.4f", mapPhases.rc().peakShare()))
-                .append("**). If reverse's column differs from identity and RC, it is a ")
-                .append("reverse field; if all three agree, the peak is compositional.\n");
+        md.append("- Slot composition: RC GC **")
+                .append(String.format(Locale.ROOT, "%.2f", slots.rc().gcPercent()))
+                .append("%** top `").append(slots.rc().topKmer())
+                .append("`; reverse GC **")
+                .append(String.format(Locale.ROOT, "%.2f", slots.reverse().gcPercent()))
+                .append("%** top `").append(slots.reverse().topKmer())
+                .append("`; identity GC **")
+                .append(String.format(Locale.ROOT, "%.2f", slots.identity().gcPercent()))
+                .append("%** top `").append(slots.identity().topKmer())
+                .append("`. If GC% or modes differ, the wrap frame is a typed record; ")
+                .append("if they match AT background, the v15 columns are sampling noise.\n");
         md.append("- Reverse-only remainder: wrap/mean **")
                 .append(String.format(Locale.ROOT, "%.3f", phases.wrapVsMean()))
                 .append("**.\n");
@@ -390,10 +403,27 @@ public final class DnaReportService {
             NeighborCensus neighbors,
             WrapReverseCensus wrapReverse,
             ReversePhaseCensus phases,
-            MapPhaseCensus mapPhases) {
+            MapPhaseCensus mapPhases,
+            SlotCensus slots) {
         long a = sequence.canonicalCounts().getOrDefault('A', 0L);
         long t = sequence.canonicalCounts().getOrDefault('T', 0L);
-        md.append("1. **R1 Map phase.** Identity peaks at ").append(mapPhases.identity().peakPhase())
+        md.append("1. **R1 Slot composition.** RC col ").append(SlotCensus.RC_COLUMN)
+                .append(" GC ")
+                .append(String.format(Locale.ROOT, "%.2f", slots.rc().gcPercent()))
+                .append("% top ").append(slots.rc().topKmer())
+                .append("×").append(slots.rc().topCount())
+                .append("; reverse col ").append(SlotCensus.REVERSE_COLUMN)
+                .append(" GC ")
+                .append(String.format(Locale.ROOT, "%.2f", slots.reverse().gcPercent()))
+                .append("% top ").append(slots.reverse().topKmer())
+                .append("×").append(slots.reverse().topCount())
+                .append("; identity col ").append(SlotCensus.IDENTITY_COLUMN)
+                .append(" GC ")
+                .append(String.format(Locale.ROOT, "%.2f", slots.identity().gcPercent()))
+                .append("% top ").append(slots.identity().topKmer())
+                .append("×").append(slots.identity().topCount())
+                .append(".\n");
+        md.append("2. **R2 Map-phase remainder.** Identity peaks at ").append(mapPhases.identity().peakPhase())
                 .append(" share ")
                 .append(String.format(Locale.ROOT, "%.4f", mapPhases.identity().peakShare()))
                 .append("; reverse at ").append(mapPhases.reverse().peakPhase())
@@ -402,8 +432,7 @@ public final class DnaReportService {
                 .append("; RC at ").append(mapPhases.rc().peakPhase())
                 .append(" share ")
                 .append(String.format(Locale.ROOT, "%.4f", mapPhases.rc().peakShare()))
-                .append(".\n");
-        md.append("2. **R2 Reverse-phase remainder.** Peak phase ").append(phases.peakPhase())
+                .append(". Reverse-only peak phase ").append(phases.peakPhase())
                 .append(" share ")
                 .append(String.format(Locale.ROOT, "%.4f", phases.peakShare()))
                 .append("; wrap/mean ")
@@ -443,6 +472,15 @@ public final class DnaReportService {
                 .append(" × ")
                 .append(String.format(Locale.ROOT, "%.3f", lags.peakEnrichment()))
                 .append(".\n\n");
+    }
+
+    private static void appendSlotRow(StringBuilder md, SlotCensus.SlotRow row, int column) {
+        md.append("| ").append(row.name()).append(" | ")
+                .append(column).append(" | ")
+                .append(row.windows()).append(" | ")
+                .append(String.format(Locale.ROOT, "%.2f", row.gcPercent())).append(" | `")
+                .append(row.topKmer().isEmpty() ? "-" : row.topKmer()).append("` | ")
+                .append(row.topCount()).append(" |\n");
     }
 
     private static String dominantBase(DnaSequence sequence) {

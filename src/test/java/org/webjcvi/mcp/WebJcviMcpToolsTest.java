@@ -52,6 +52,7 @@ class WebJcviMcpToolsTest {
                         "find_mirrors",
                         "flag_seams",
                         "phase_mirrors",
+                        "extract_fields",
                         "analyze_logs",
                         "list_files",
                         "read_file");
@@ -101,7 +102,7 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Map phase");
+        assertThat(markdown).contains("Slot composition");
         assertThat(markdown).contains("Frame remainder");
     }
 
@@ -241,6 +242,23 @@ class WebJcviMcpToolsTest {
         assertThat(result).contains("ABCD | DCBA");
         assertThat(result).doesNotContain("hidden");
         assertThat(tools.readFile("secret.txt")).isEqualTo("abcddcba-hidden");
+    }
+
+    @Test
+    void extractFieldsDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "GCTAGCTA-hidden");
+        char[] buf = new char[70];
+        java.util.Arrays.fill(buf, 'x');
+        "gctagcta".getChars(0, 8, buf, 4);
+        "abcddcba".getChars(0, 8, buf, 19);
+        "atgcatgc".getChars(0, 8, buf, 58);
+        String result = tools.extractFields(new String(buf), 70);
+        assertThat(result).contains("records=1");
+        assertThat(result).contains("rc GCTAGCTA");
+        assertThat(result).contains("rev ABCDDCBA");
+        assertThat(result).contains("id ATGCATGC");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("GCTAGCTA-hidden");
     }
 
     @Test

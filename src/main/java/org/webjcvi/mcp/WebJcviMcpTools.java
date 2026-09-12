@@ -37,6 +37,8 @@ import org.webjcvi.seam.SeamException;
 import org.webjcvi.seam.SeamGuard;
 import org.webjcvi.phase.PhaseException;
 import org.webjcvi.phase.PhaseJoint;
+import org.webjcvi.frame.FrameException;
+import org.webjcvi.frame.FrameFields;
 import org.webjcvi.logs.LogAnalysisService;
 
 /**
@@ -63,13 +65,15 @@ public class WebJcviMcpTools {
     private final MirrorJoint mirrors;
     private final SeamGuard seams;
     private final PhaseJoint phase;
+    private final FrameFields fields;
     private final LogAnalysisService logAnalysis;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
         this(storage, reports, new ScratchTape(), new BannerSplitter(), new PairDrift(),
                 new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer(), new KmerStamp(),
                 new PalindromeScan(), new StemLoop(), new FuzzyFind(), new BlockContrast(),
-                new MirrorJoint(), new SeamGuard(), new PhaseJoint(), new LogAnalysisService());
+                new MirrorJoint(), new SeamGuard(), new PhaseJoint(), new FrameFields(),
+                new LogAnalysisService());
     }
 
     @Autowired
@@ -90,6 +94,7 @@ public class WebJcviMcpTools {
             MirrorJoint mirrors,
             SeamGuard seams,
             PhaseJoint phase,
+            FrameFields fields,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -107,6 +112,7 @@ public class WebJcviMcpTools {
         this.mirrors = mirrors;
         this.seams = seams;
         this.phase = phase;
+        this.fields = fields;
         this.logAnalysis = logAnalysis;
     }
 
@@ -486,6 +492,31 @@ public class WebJcviMcpTools {
         });
     }
 
+    @Tool(name = "extract_fields", description = "Extract the three 8-character slots (columns 4, 19, 58) from 70-wide wrap frames of caller-supplied text. Newlines are dropped. Not the DNA file and not a project path.")
+    public String extractFields(
+            @ToolParam(description = "Arbitrary text to scan") String text,
+            @ToolParam(description = "Wrap frame width; use 70 unless you need a different floor") int wrapWidth) {
+        return run(() -> {
+            int wrap = wrapWidth < 66 ? FrameFields.DEFAULT_WRAP : wrapWidth;
+            var scan = fields.extract(text, wrap);
+            StringBuilder out = new StringBuilder(scan.summary()).append('\n');
+            if (scan.records().isEmpty()) {
+                out.append("(no records)");
+                return out.toString();
+            }
+            for (var row : scan.records()) {
+                out.append("#").append(row.index())
+                        .append(" offset ").append(row.offset())
+                        .append('\n')
+                        .append("rc ").append(row.rc())
+                        .append(" rev ").append(row.reverse())
+                        .append(" id ").append(row.identity())
+                        .append('\n');
+            }
+            return out.toString();
+        });
+    }
+
     @Tool(name = "analyze_logs", description = "Analyze caller-supplied log text with the shared log-analysis facade. Returns a JSON report. Not the DNA file. Truncates at 524288 characters.")
     public String analyzeLogs(
             @ToolParam(description = "Log text to analyze") String text) {
@@ -517,7 +548,7 @@ public class WebJcviMcpTools {
             return action.execute();
         } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException
                  | RareException | TokenException | StampException | FoldException | LoopException
-                 | FuzzyException | ContrastException | MirrorException | SeamException | PhaseException e) {
+                 | FuzzyException | ContrastException | MirrorException | SeamException | PhaseException | FrameException e) {
             return "Error: " + e.getMessage();
         }
     }

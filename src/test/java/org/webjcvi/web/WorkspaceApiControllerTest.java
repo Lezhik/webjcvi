@@ -129,6 +129,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/mirror");
                     assertThat(html).contains("/seam");
                     assertThat(html).contains("/phase");
+                    assertThat(html).contains("/fields");
                 });
     }
 
@@ -704,6 +705,58 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void fieldsApiExtractsThreeSlots() {
+        char[] buf = new char[70];
+        java.util.Arrays.fill(buf, 'x');
+        "gctagcta".getChars(0, 8, buf, 4);
+        "abcddcba".getChars(0, 8, buf, 19);
+        "atgcatgc".getChars(0, 8, buf, 58);
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/fields")
+                        .queryParam("text", new String(buf))
+                        .queryParam("wrap", "70")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.recordCount").isEqualTo(1)
+                .jsonPath("$.records[0].rc").isEqualTo("GCTAGCTA")
+                .jsonPath("$.records[0].reverse").isEqualTo("ABCDDCBA")
+                .jsonPath("$.records[0].identity").isEqualTo("ATGCATGC");
+    }
+
+    @Test
+    void fieldsPageRenders() {
+        webTestClient.get()
+                .uri("/fields")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Frame fields"));
+    }
+
+    @Test
+    void fieldsPageFormExtractsThreeSlots() {
+        char[] buf = new char[70];
+        java.util.Arrays.fill(buf, 'x');
+        "gctagcta".getChars(0, 8, buf, 4);
+        "abcddcba".getChars(0, 8, buf, 19);
+        "atgcatgc".getChars(0, 8, buf, 58);
+        webTestClient.post()
+                .uri("/fields")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=" + new String(buf) + "&wrap=70")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("GCTAGCTA");
+                    assertThat(html).contains("ABCDDCBA");
+                    assertThat(html).contains("ATGCATGC");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -727,6 +780,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.contrast.stutterCount").isNumber()
                 .jsonPath("$.mirrors.jointCount").isNumber()
                 .jsonPath("$.seams.hitCount").isNumber()
-                .jsonPath("$.phase.hitCount").isNumber();
+                .jsonPath("$.phase.hitCount").isNumber()
+                .jsonPath("$.fields.recordCount").isNumber();
     }
 }

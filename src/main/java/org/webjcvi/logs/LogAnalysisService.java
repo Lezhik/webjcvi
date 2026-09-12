@@ -19,6 +19,7 @@ import org.webjcvi.contrast.BlockContrast;
 import org.webjcvi.mirror.MirrorJoint;
 import org.webjcvi.seam.SeamGuard;
 import org.webjcvi.phase.PhaseJoint;
+import org.webjcvi.frame.FrameFields;
 
 /**
  * Fixed-API facade over the text-processing algorithms for log analysis.
@@ -49,12 +50,13 @@ public final class LogAnalysisService {
     private final MirrorJoint mirrors;
     private final SeamGuard seams;
     private final PhaseJoint phase;
+    private final FrameFields fields;
 
     public LogAnalysisService() {
         this(new BannerSplitter(), new PairDrift(), new WrapReflow(), new RareClassScanner(),
                 new RareBreakTokenizer(), new KmerStamp(), new PalindromeScan(), new StemLoop(),
                 new FuzzyFind(), new BlockContrast(), new MirrorJoint(), new SeamGuard(),
-                new PhaseJoint());
+                new PhaseJoint(), new FrameFields());
     }
 
     public LogAnalysisService(
@@ -70,7 +72,8 @@ public final class LogAnalysisService {
             BlockContrast contrast,
             MirrorJoint mirrors,
             SeamGuard seams,
-            PhaseJoint phase) {
+            PhaseJoint phase,
+            FrameFields fields) {
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
@@ -84,6 +87,7 @@ public final class LogAnalysisService {
         this.mirrors = mirrors;
         this.seams = seams;
         this.phase = phase;
+        this.fields = fields;
     }
 
     /**
@@ -201,6 +205,15 @@ public final class LogAnalysisService {
                 phaseScan.phase(),
                 phaseScan.blockWidth());
 
+        var fieldScan = fields.extract(payload);
+        var fieldSection = new LogAnalysisReport.FieldSection(
+                fieldScan.recordCount(),
+                fieldScan.recordCount(),
+                fieldScan.wrapWidth(),
+                fieldScan.topRc(),
+                fieldScan.topReverse(),
+                fieldScan.topIdentity());
+
         LogAnalysisReport report = new LogAnalysisReport(
                 API_VERSION,
                 inputLength,
@@ -218,9 +231,10 @@ public final class LogAnalysisService {
                 contrastSection,
                 mirrorSection,
                 seamSection,
-                phaseSection);
+                phaseSection,
+                fieldSection);
         if (log.isDebugEnabled()) {
-            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={}",
+            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={}",
                     truncated,
                     tapeSection.runCount(),
                     bannerSection.sectionCount(),
@@ -233,7 +247,8 @@ public final class LogAnalysisService {
                     contrastSection.stutterCount(),
                     mirrorSection.jointCount(),
                     seamSection.hitCount(),
-                    phaseSection.hitCount());
+                    phaseSection.hitCount(),
+                    fieldSection.recordCount());
         }
         return report;
     }

@@ -47,6 +47,7 @@
         <p><a href="/mirror">Mirror joints</a> (adjacent reverse blocks that are not copies).</p>
         <p><a href="/seam">Seam guard</a> (palindromic glue at hard-wrap line joints).</p>
         <p><a href="/phase">Phase joints</a> (reverse field at wrap-frame column 19).</p>
+        <p><a href="/fields">Frame fields</a> (extract RC/reverse/identity slots from 70-wide records).</p>
         <form method="post" action="/report/regenerate">
             <button type="submit">Regenerate report</button>
         </form>
