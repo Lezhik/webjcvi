@@ -12,6 +12,7 @@ import org.webjcvi.tape.ScratchTape;
 import org.webjcvi.drift.PairDrift;
 import org.webjcvi.rare.RareClassScanner;
 import org.webjcvi.reflow.WrapReflow;
+import org.webjcvi.token.RareBreakTokenizer;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -55,6 +56,11 @@ public class WebJcviConfiguration {
     @Bean
     RareClassScanner rareClassScanner() {
         return new RareClassScanner();
+    }
+
+    @Bean
+    RareBreakTokenizer rareBreakTokenizer(RareClassScanner rareClassScanner) {
+        return new RareBreakTokenizer(rareClassScanner);
     }
 
     @Bean

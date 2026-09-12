@@ -19,6 +19,8 @@ import org.webjcvi.rare.RareClassScanner;
 import org.webjcvi.rare.RareException;
 import org.webjcvi.reflow.ReflowException;
 import org.webjcvi.reflow.WrapReflow;
+import org.webjcvi.token.RareBreakTokenizer;
+import org.webjcvi.token.TokenException;
 
 /**
  * MCP tool surface. File tools go through {@link FileStorageService}. The
@@ -35,10 +37,11 @@ public class WebJcviMcpTools {
     private final PairDrift drift;
     private final WrapReflow reflow;
     private final RareClassScanner rare;
+    private final RareBreakTokenizer tokenizer;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
         this(storage, reports, new ScratchTape(), new BannerSplitter(), new PairDrift(),
-                new WrapReflow(), new RareClassScanner());
+                new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer());
     }
 
     @Autowired
@@ -49,7 +52,8 @@ public class WebJcviMcpTools {
             BannerSplitter splitter,
             PairDrift drift,
             WrapReflow reflow,
-            RareClassScanner rare) {
+            RareClassScanner rare,
+            RareBreakTokenizer tokenizer) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
@@ -57,6 +61,7 @@ public class WebJcviMcpTools {
         this.drift = drift;
         this.reflow = reflow;
         this.rare = rare;
+        this.tokenizer = tokenizer;
     }
 
     @Tool(name = "regenerate_dna_report", description = "Clear prior reports and rebuild the DNA report from jcvi-dna.txt and the current codebase.")
@@ -219,6 +224,29 @@ public class WebJcviMcpTools {
         });
     }
 
+    @Tool(name = "cut_tokens", description = "Split caller-supplied text on the rare character class (bottom ~24.14% of symbol mass) and list the majority tokens between those breaks. Not the DNA file and not a project path.")
+    public String cutTokens(
+            @ToolParam(description = "Arbitrary text to tokenize") String text,
+            @ToolParam(description = "Minimum token length; use 2 unless you need a different floor") int minToken) {
+        return run(() -> {
+            int floor = minToken < 2 ? RareBreakTokenizer.DEFAULT_MIN_TOKEN : minToken;
+            var cut = tokenizer.cut(text, floor);
+            StringBuilder out = new StringBuilder(cut.summary()).append('\n');
+            if (cut.tokens().isEmpty()) {
+                out.append("(no tokens)");
+                return out.toString();
+            }
+            for (var token : cut.tokens()) {
+                out.append("#").append(token.index())
+                        .append(" offset ").append(token.offset())
+                        .append(" length ").append(token.length())
+                        .append('\n')
+                        .append(token.preview()).append('\n');
+            }
+            return out.toString();
+        });
+    }
+
     @Tool(name = "list_files", description = "List files inside the project directory. Paths must be relative to the project root.")
     public String listFiles(
             @ToolParam(description = "Relative directory to list, or '.' for the project root") String path,
@@ -243,7 +271,7 @@ public class WebJcviMcpTools {
         try {
             return action.execute();
         } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException
-                 | RareException e) {
+                 | RareException | TokenException e) {
             return "Error: " + e.getMessage();
         }
     }

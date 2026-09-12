@@ -30,6 +30,21 @@ public final class RareClassScanner {
         return scan(text, DEFAULT_MIN_ISLAND);
     }
 
+    /**
+     * Rare-class alphabet of {@code text} (bottom {@link #DEFAULT_MASS} of
+     * non-whitespace mass). Shared with the rare-break tokenizer.
+     */
+    public Set<Character> rareSymbols(String text) {
+        if (text == null) {
+            throw new RareException("Text is missing");
+        }
+        if (text.length() > MAX_CHARS) {
+            throw new RareException("Text exceeds " + MAX_CHARS + " characters");
+        }
+        Freq freq = frequencies(text);
+        return rareClass(freq.counts(), freq.total());
+    }
+
     public Scan scan(String text, int minIsland) {
         if (text == null) {
             throw new RareException("Text is missing");
@@ -38,19 +53,10 @@ public final class RareClassScanner {
             throw new RareException("Text exceeds " + MAX_CHARS + " characters");
         }
         int floor = minIsland < 2 ? DEFAULT_MIN_ISLAND : minIsland;
-        Map<Character, Long> freq = new LinkedHashMap<>();
-        long total = 0;
-        for (int i = 0; i < text.length(); i++) {
-            char raw = text.charAt(i);
-            if (Character.isWhitespace(raw)) {
-                continue;
-            }
-            char ch = Character.toUpperCase(raw);
-            freq.merge(ch, 1L, Long::sum);
-            total++;
-        }
-        Set<Character> rare = rareClass(freq, total);
+        Freq freq = frequencies(text);
+        Set<Character> rare = rareClass(freq.counts(), freq.total());
         String rareLabel = rareLabel(rare);
+        long total = freq.total();
         if (total == 0 || rare.isEmpty()) {
             return new Scan(rareLabel, total, 0, 0, List.of());
         }
@@ -81,6 +87,21 @@ public final class RareClassScanner {
             i = j;
         }
         return new Scan(rareLabel, total, rare.size(), islands.size(), List.copyOf(islands));
+    }
+
+    static Freq frequencies(String text) {
+        Map<Character, Long> freq = new LinkedHashMap<>();
+        long total = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char raw = text.charAt(i);
+            if (Character.isWhitespace(raw)) {
+                continue;
+            }
+            char ch = Character.toUpperCase(raw);
+            freq.merge(ch, 1L, Long::sum);
+            total++;
+        }
+        return new Freq(freq, total);
     }
 
     static Set<Character> rareClass(Map<Character, Long> freq, long total) {
@@ -133,5 +154,8 @@ public final class RareClassScanner {
     }
 
     public record Island(int index, int offset, int length, String preview) {
+    }
+
+    record Freq(Map<Character, Long> counts, long total) {
     }
 }

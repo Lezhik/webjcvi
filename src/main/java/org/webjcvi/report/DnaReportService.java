@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.StringJoiner;
+import org.webjcvi.dna.CodonFrameCensus;
 import org.webjcvi.dna.DimerContrast;
 import org.webjcvi.dna.DnaParser;
 import org.webjcvi.dna.DnaSequence;
@@ -95,10 +96,11 @@ public final class DnaReportService {
         WrapJointCensus joints = WrapJointCensus.fromRaw(raw);
         DimerContrast dimers = DimerContrast.from(sequence, joints);
         GcIslandCensus gcIslands = GcIslandCensus.from(sequence);
+        CodonFrameCensus codons = CodonFrameCensus.from(sequence);
         Map<String, String> sections = buildSections(
-                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands);
+                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons);
         String markdown = renderMarkdown(
-                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands);
+                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons);
         storage.writeText(reportRelativePath(), markdown);
         return new DnaReport(generatedAt, sequence, sections, markdown);
     }
@@ -147,7 +149,8 @@ public final class DnaReportService {
             SkewIslandCensus islands,
             WrapJointCensus joints,
             DimerContrast dimers,
-            GcIslandCensus gcIslands) {
+            GcIslandCensus gcIslands,
+            CodonFrameCensus codons) {
         Map<String, String> sections = new LinkedHashMap<>();
         sections.put("meta", "generatedAt=" + ISO.format(generatedAt));
         sections.put("length", Integer.toString(sequence.length()));
@@ -156,11 +159,11 @@ public final class DnaReportService {
         sections.put("invalidTotal", Long.toString(sequence.invalidTotal()));
         sections.put("javaSourceCount", Integer.toString(javaSources.size()));
         sections.put("wrapModalWidth", Integer.toString(wraps.modalWidth()));
-        sections.put("gcIslands", Integer.toString(gcIslands.gcIslands()));
-        sections.put("longestGcIsland", Integer.toString(gcIslands.longestGc()));
-        sections.put("gcIslandsAtLeast5", Integer.toString(gcIslands.gcIslandsAtLeast5()));
-        sections.put("atIslands", Integer.toString(gcIslands.atIslands()));
-        sections.put("longestAtIsland", Integer.toString(gcIslands.longestAt()));
+        sections.put("bestAtgPhase", Integer.toString(codons.bestAtgPhase()));
+        sections.put("maxAtg", Integer.toString(codons.maxAtg()));
+        sections.put("bestStopPhase", Integer.toString(codons.bestStopPhase()));
+        sections.put("maxStops", Integer.toString(codons.maxStops()));
+        sections.put("maxGcSpread", String.format(Locale.ROOT, "%.2f", codons.maxGcSpread()));
         sections.put("longestHomopolymer", runs.longestBase() + "x" + runs.longestLength());
         return sections;
     }
@@ -176,17 +179,16 @@ public final class DnaReportService {
             SkewIslandCensus islands,
             WrapJointCensus joints,
             DimerContrast dimers,
-            GcIslandCensus gcIslands) {
+            GcIslandCensus gcIslands,
+            CodonFrameCensus codons) {
         StringBuilder md = new StringBuilder();
         md.append("# WebJCVI DNA Report\n\n");
         md.append("Generated at **").append(ISO.format(generatedAt.atOffset(ZoneOffset.UTC))).append("**.\n\n");
         md.append("This report is rebuilt from `").append(dnaRelativePath)
-                .append("` and a snapshot of the current codebase. Version 6 of the builder ")
-                .append("counts two-class islands on the linear tape: consecutive GC (the minority ")
-                .append("mass, measured 24.14%) versus consecutive AT (the majority). Homopolymers ")
-                .append("count one letter; Chargaff windows mix both classes; joint dimers asked ")
-                .append("whether wrap seams were special (they were not). This census asks how ")
-                .append("the rare class clusters.\n\n");
+                .append("` and a snapshot of the current codebase. Version 7 of the builder ")
+                .append("reads the tape as non-overlapping triplets in three start phases: ")
+                .append("ATG/stop counts and GC% at codon positions 1/2/3. Island geography ")
+                .append("and wrap dimers never asked whether the tape is 3-periodic.\n\n");
 
         md.append("## Sequence composition\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
@@ -227,22 +229,40 @@ public final class DnaReportService {
         md.append("First ").append(PREVIEW_BASES).append(" normalized bases:\n\n```\n");
         md.append(sequence.preview(PREVIEW_BASES)).append("\n```\n\n");
 
-        md.append("## AT vs GC islands\n\n");
-        md.append("A GC island is a maximal run of G and C (mixed allowed). An AT island is a ")
-                .append("maximal run of A and T. Single-base homopolymers are a special case of ")
-                .append("these islands; mixed GC runs were never counted before.\n\n");
-        md.append("| Metric | Value |\n| --- | --- |\n");
-        md.append("| GC islands | ").append(gcIslands.gcIslands()).append(" |\n");
-        md.append("| Longest GC island | ").append(gcIslands.longestGc()).append(" |\n");
-        md.append("| GC islands of length ≥ 5 | ").append(gcIslands.gcIslandsAtLeast5()).append(" |\n");
-        md.append("| GC islands of length ≥ 10 | ").append(gcIslands.gcIslandsAtLeast10()).append(" |\n");
-        md.append("| GC bases inside islands | ").append(gcIslands.gcBasesInIslands()).append(" |\n");
-        md.append("| AT islands | ").append(gcIslands.atIslands()).append(" |\n");
-        md.append("| Longest AT island | ").append(gcIslands.longestAt()).append(" |\n\n");
-        md.append("`").append(gcIslands.toTextRow()).append("`\n\n");
+        md.append("## Codon frames\n\n");
+        md.append("Non-overlapping canonical triplets, three start phases. ATG is counted as ")
+                .append("start-like; TAA/TAG/TGA as stop-like. GC spread is |GC% at position 3 − GC% at position 1|. ")
+                .append("If one phase is coding-like, ATG/stops and GC-by-position should disagree across phases.\n\n");
+        md.append("| Phase | Codons | GC% pos1 | GC% pos2 | GC% pos3 | ATG | Stops | Top codon |\n");
+        md.append("| --- | --- | --- | --- | --- | --- | --- | --- |\n");
+        for (var frame : codons.frames()) {
+            md.append("| ").append(frame.phase()).append(" | ")
+                    .append(frame.codonCount()).append(" | ")
+                    .append(String.format(Locale.ROOT, "%.2f", frame.gcPos1())).append(" | ")
+                    .append(String.format(Locale.ROOT, "%.2f", frame.gcPos2())).append(" | ")
+                    .append(String.format(Locale.ROOT, "%.2f", frame.gcPos3())).append(" | ")
+                    .append(frame.atg()).append(" | ")
+                    .append(frame.stops()).append(" | `")
+                    .append(frame.topCodon()).append("` × ")
+                    .append(frame.topCount()).append(" |\n");
+        }
+        md.append("\n| Metric | Value |\n| --- | --- |\n");
+        md.append("| Phase with most ATG | ").append(codons.bestAtgPhase())
+                .append(" (").append(codons.maxAtg()).append(") |\n");
+        md.append("| Phase with most stops | ").append(codons.bestStopPhase())
+                .append(" (").append(codons.maxStops()).append(") |\n");
+        md.append("| Max GC spread (pos3 vs pos1) | ")
+                .append(String.format(Locale.ROOT, "%.2f", codons.maxGcSpread())).append(" |\n\n");
+        md.append("`").append(codons.toTextRow()).append("`\n\n");
 
         md.append("## Frame remainder\n\n");
-        md.append("Wrap min/median/modal/max: ")
+        md.append("GC islands **").append(gcIslands.gcIslands())
+                .append("**, longest **").append(gcIslands.longestGc())
+                .append("**, ≥5 **").append(gcIslands.gcIslandsAtLeast5())
+                .append("**, ≥10 **").append(gcIslands.gcIslandsAtLeast10())
+                .append("**. AT islands **").append(gcIslands.atIslands())
+                .append("**, longest **").append(gcIslands.longestAt())
+                .append("**. Wrap min/median/modal/max: ")
                 .append(wraps.minWidth()).append(" / ")
                 .append(wraps.medianWidth()).append(" / ")
                 .append(wraps.modalWidth()).append(" / ")
@@ -251,27 +271,18 @@ public final class DnaReportService {
                 .append(String.format(Locale.ROOT, "%.1f%%", dimers.sameBaseGlobalShare()))
                 .append(" / ")
                 .append(String.format(Locale.ROOT, "%.1f%%", dimers.sameBaseJointShare()))
-                .append("** (most enriched `")
-                .append(dimers.mostEnriched().isEmpty() ? "-" : dimers.mostEnriched())
-                .append("` × ")
-                .append(String.format(Locale.ROOT, "%.2f", dimers.mostEnrichedValue()))
-                .append("). Complementary joints **")
+                .append("**. Complementary joints **")
                 .append(String.format(Locale.ROOT, "%.1f%%", joints.complementaryShare()))
                 .append("**. Skew islands fail/pass **")
                 .append(islands.failIslands()).append(" / ").append(islands.passIslands())
-                .append("** (longest fail ").append(islands.longestFail())
-                .append(", pass ").append(islands.longestPass())
-                .append("). Mean |AT-skew| **")
+                .append("**. Mean |AT-skew| **")
                 .append(String.format(Locale.ROOT, "%.4f", skew.meanAbsAtSkew()))
                 .append("**. Homopolymer longest **")
                 .append(runs.longestBase()).append(" × ").append(runs.longestLength())
-                .append("**; 5–9 / 10–19 / 20+: ")
-                .append(runs.runs5to9()).append(" / ")
-                .append(runs.runs10to19()).append(" / ")
-                .append(runs.runs20plus()).append(".\n\n");
+                .append("**.\n\n");
 
         md.append("## Extracted tape rules\n\n");
-        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands);
+        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons);
 
         md.append("## Codebase snapshot\n\n");
         md.append(javaSources.size()).append(" Java source files under `src/main/java`:\n\n");
@@ -286,25 +297,25 @@ public final class DnaReportService {
 
         md.append("## Growth notes for the next iteration\n\n");
         md.append("- Dominant canonical base: **").append(dominantBase(sequence)).append("**.\n");
-        md.append("- GC share **")
-                .append(String.format(Locale.ROOT, "%.2f%%", sequence.gcPercent()))
-                .append("**. GC islands **").append(gcIslands.gcIslands())
+        md.append("- Codon frames: most ATG in phase **").append(codons.bestAtgPhase())
+                .append("** (").append(codons.maxAtg())
+                .append("), most stops in phase **").append(codons.bestStopPhase())
+                .append("** (").append(codons.maxStops())
+                .append("), max GC spread **")
+                .append(String.format(Locale.ROOT, "%.2f", codons.maxGcSpread()))
+                .append("**. If ATG and stops peak in the same phase and GC-by-position is flat, ")
+                .append("the tape is not coding-like; the next hypothesis should drop period-3 ")
+                .append("or look at a different period / alphabet.\n");
+        md.append("- GC islands **").append(gcIslands.gcIslands())
                 .append("**, longest **").append(gcIslands.longestGc())
-                .append("**, length ≥5 **").append(gcIslands.gcIslandsAtLeast5())
-                .append("**, length ≥10 **").append(gcIslands.gcIslandsAtLeast10())
+                .append("**, ≥10 **").append(gcIslands.gcIslandsAtLeast10())
                 .append("**. AT islands **").append(gcIslands.atIslands())
-                .append("**, longest **").append(gcIslands.longestAt())
-                .append("**. If mixed GC islands stay as short as single-base G/C homopolymers, ")
-                .append("the rare class does not cluster; the next hypothesis should look at ")
-                .append("island-length distribution or a different alphabet partition.\n");
+                .append("**, longest **").append(gcIslands.longestAt()).append("**.\n");
         md.append("- Wrap joints remain unspecial: same-base global **")
                 .append(String.format(Locale.ROOT, "%.1f%%", dimers.sameBaseGlobalShare()))
                 .append("** vs joints **")
                 .append(String.format(Locale.ROOT, "%.1f%%", dimers.sameBaseJointShare()))
                 .append("**.\n");
-        md.append("- Skew islands remain: fail/pass **")
-                .append(islands.failIslands()).append(" / ").append(islands.passIslands())
-                .append("**, longest fail **").append(islands.longestFail()).append("**.\n");
         md.append("- Homopolymer longest **").append(runs.longestBase()).append(" × ")
                 .append(runs.longestLength()).append("**.\n");
         md.append("- Module split (TZ §6.12) is **not** indicated: single Gradle module, no sub-module reports.\n");
@@ -325,29 +336,33 @@ public final class DnaReportService {
             SkewIslandCensus islands,
             WrapJointCensus joints,
             DimerContrast dimers,
-            GcIslandCensus gcIslands) {
+            GcIslandCensus gcIslands,
+            CodonFrameCensus codons) {
         long a = sequence.canonicalCounts().getOrDefault('A', 0L);
         long t = sequence.canonicalCounts().getOrDefault('T', 0L);
-        md.append("1. **R1 GC is the minority class.** GC% ")
-                .append(String.format(Locale.ROOT, "%.2f", sequence.gcPercent()))
-                .append(" of the tape; G+C never form the long single-base banners (homopolymer max G/C is short).\n");
-        md.append("2. **R2 Mixed GC still clusters as one island.** GC islands ")
+        md.append("1. **R1 Rare class is a short break, not a payload.** GC islands ")
                 .append(gcIslands.gcIslands())
                 .append(", longest ").append(gcIslands.longestGc())
-                .append(", ≥5 ").append(gcIslands.gcIslandsAtLeast5())
                 .append(", ≥10 ").append(gcIslands.gcIslandsAtLeast10())
                 .append(".\n");
-        md.append("3. **R3 AT is the majority payload.** AT islands ")
+        md.append("2. **R2 Majority class is the token.** AT islands ")
                 .append(gcIslands.atIslands())
                 .append(", longest ").append(gcIslands.longestAt())
                 .append(". Global A=").append(a).append(", T=").append(t).append(".\n");
-        md.append("4. **R4 Wrap joints were not a special seam.** Same-base dimers ")
+        md.append("3. **R3 Period-3 is untested by islands.** Most ATG in phase ")
+                .append(codons.bestAtgPhase()).append(" (").append(codons.maxAtg())
+                .append("), most stops in phase ")
+                .append(codons.bestStopPhase()).append(" (").append(codons.maxStops())
+                .append("), max GC spread ")
+                .append(String.format(Locale.ROOT, "%.2f", codons.maxGcSpread()))
+                .append(".\n");
+        md.append("4. **R4 Wrap joints remain unspecial.** Same-base dimers ")
                 .append(String.format(Locale.ROOT, "%.1f%%", dimers.sameBaseGlobalShare()))
                 .append(" globally vs ")
                 .append(String.format(Locale.ROOT, "%.1f%%", dimers.sameBaseJointShare()))
-                .append(" at joints; complementary joints ")
+                .append(" at joints; wrap modal ").append(wraps.modalWidth())
+                .append("; complementary joints ")
                 .append(String.format(Locale.ROOT, "%.1f%%", joints.complementaryShare()))
-                .append("; wrap modal ").append(wraps.modalWidth())
                 .append("; skew fail/pass ")
                 .append(islands.failIslands()).append("/").append(islands.passIslands())
                 .append("; mean |AT-skew| ")

@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.webjcvi.drift.PairDrift;
 import org.webjcvi.rare.RareClassScanner;
 import org.webjcvi.reflow.WrapReflow;
+import org.webjcvi.token.RareBreakTokenizer;
 import org.webjcvi.report.DnaReport;
 import org.webjcvi.report.DnaReportService;
 import org.webjcvi.segment.BannerSplitter;
@@ -36,6 +37,7 @@ public class WorkspaceApiController {
     private final PairDrift drift;
     private final WrapReflow wrapReflow;
     private final RareClassScanner rareScanner;
+    private final RareBreakTokenizer tokenizer;
 
     public WorkspaceApiController(
             FileStorageService storage,
@@ -44,7 +46,8 @@ public class WorkspaceApiController {
             BannerSplitter splitter,
             PairDrift drift,
             WrapReflow wrapReflow,
-            RareClassScanner rareScanner) {
+            RareClassScanner rareScanner,
+            RareBreakTokenizer tokenizer) {
         this.storage = storage;
         this.reports = reports;
         this.tape = tape;
@@ -52,6 +55,7 @@ public class WorkspaceApiController {
         this.drift = drift;
         this.wrapReflow = wrapReflow;
         this.rareScanner = rareScanner;
+        this.tokenizer = tokenizer;
     }
 
     @GetMapping("/files")
@@ -233,6 +237,31 @@ public class WorkspaceApiController {
                                 row.put("offset", island.offset());
                                 row.put("length", island.length());
                                 row.put("preview", island.preview());
+                                return row;
+                            })
+                            .toList());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/tokens")
+    public Mono<Map<String, Object>> cutTokens(
+            @RequestParam("text") String text,
+            @RequestParam(name = "min", defaultValue = "2") int minToken) {
+        return Mono.fromCallable(() -> {
+                    var cut = tokenizer.cut(text, minToken);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("rareClass", cut.rareClass());
+                    body.put("rareSymbolCount", cut.rareSymbolCount());
+                    body.put("tokenCount", cut.tokenCount());
+                    body.put("tokens", cut.tokens().stream()
+                            .map(token -> {
+                                Map<String, Object> row = new LinkedHashMap<>();
+                                row.put("index", token.index());
+                                row.put("offset", token.offset());
+                                row.put("length", token.length());
+                                row.put("preview", token.preview());
                                 return row;
                             })
                             .toList());

@@ -38,6 +38,7 @@
         <p><a href="/drift">Open pair drift</a> (find local bracket imbalance in 70-char windows).</p>
         <p><a href="/reflow">Unwrap hard wrap</a> (join lines of width 70 into paragraphs).</p>
         <p><a href="/rare">Rare-class islands</a> (list hex, IDs, punctuation clusters in the bottom 24% of symbol mass).</p>
+        <p><a href="/tokens">Rare-break tokens</a> (split on the rare class, keep the majority words).</p>
         <form method="post" action="/report/regenerate">
             <button type="submit">Regenerate report</button>
         </form>

@@ -120,6 +120,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/drift");
                     assertThat(html).contains("/reflow");
                     assertThat(html).contains("/rare");
+                    assertThat(html).contains("/tokens");
                 });
     }
 
@@ -321,6 +322,46 @@ class WorkspaceApiControllerTest {
                 .value(html -> {
                     assertThat(html).contains("1 island");
                     assertThat(html).contains("GCGCGC");
+                });
+    }
+
+    @Test
+    void tokensApiSplitsOnGcLikeBreaks() {
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/tokens")
+                        .queryParam("text", "AAAAAAAAAA GCGCGC AAAAAAAAAA")
+                        .queryParam("min", "2")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.tokenCount").isEqualTo(2)
+                .jsonPath("$.tokens[0].preview").isEqualTo("AAAAAAAAAA")
+                .jsonPath("$.tokens[1].preview").isEqualTo("AAAAAAAAAA");
+    }
+
+    @Test
+    void tokensPageRenders() {
+        webTestClient.get()
+                .uri("/tokens")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Rare-break tokens"));
+    }
+
+    @Test
+    void tokensPageFormSplitsOnGcLikeBreaks() {
+        webTestClient.post()
+                .uri("/tokens")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=AAAAAAAAAA+GCGCGC+AAAAAAAAAA&min=2")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("2 token");
+                    assertThat(html).contains("AAAAAAAAAA");
                 });
     }
 }

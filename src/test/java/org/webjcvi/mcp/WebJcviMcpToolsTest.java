@@ -43,6 +43,7 @@ class WebJcviMcpToolsTest {
                         "pair_drift",
                         "unwrap_wraps",
                         "rare_islands",
+                        "cut_tokens",
                         "list_files",
                         "read_file");
     }
@@ -91,7 +92,7 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("AT vs GC islands");
+        assertThat(markdown).contains("Codon frames");
         assertThat(markdown).contains("Frame remainder");
     }
 
@@ -141,5 +142,14 @@ class WebJcviMcpToolsTest {
         assertThat(result).contains("GCGCGC");
         assertThat(result).doesNotContain("hidden");
         assertThat(tools.readFile("secret.txt")).isEqualTo("GCGCGC-hidden");
+    }
+
+    @Test
+    void cutTokensDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "hidden-token");
+        String result = tools.cutTokens("AAAAAAAAAA GCGCGC AAAAAAAAAA", 2);
+        assertThat(result).contains("AAAAAAAAAA");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("hidden-token");
     }
 }
