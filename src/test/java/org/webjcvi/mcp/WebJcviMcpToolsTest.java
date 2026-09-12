@@ -55,6 +55,7 @@ class WebJcviMcpToolsTest {
                         "extract_fields",
                         "find_clones",
                         "group_prefixes",
+                        "measure_key_width",
                         "analyze_logs",
                         "list_files",
                         "read_file");
@@ -104,7 +105,7 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Prefix families");
+        assertThat(markdown).contains("Key width");
         assertThat(markdown).contains("Frame remainder");
     }
 
@@ -282,6 +283,18 @@ class WebJcviMcpToolsTest {
         String result = tools.groupPrefixes(a + b, 70, 8);
         assertThat(result).contains("familyCount=1");
         assertThat(result).contains("prefix HEADHEAD");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("HEADHEAD-hidden");
+    }
+
+    @Test
+    void measureKeyWidthDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "HEADHEAD-hidden");
+        String a = "HEADHEAD" + "A".repeat(62);
+        String b = "HEADHEAD" + "B".repeat(62);
+        String result = tools.measureKeyWidth(a + b, 70);
+        assertThat(result).contains("uniqueAt=9");
+        assertThat(result).contains("k 9");
         assertThat(result).doesNotContain("hidden");
         assertThat(tools.readFile("secret.txt")).isEqualTo("HEADHEAD-hidden");
     }

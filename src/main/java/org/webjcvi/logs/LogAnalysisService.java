@@ -22,6 +22,7 @@ import org.webjcvi.phase.PhaseJoint;
 import org.webjcvi.frame.FrameFields;
 import org.webjcvi.clone.CloneScan;
 import org.webjcvi.prefix.PrefixGroup;
+import org.webjcvi.key.KeyWidth;
 
 /**
  * Fixed-API facade over the text-processing algorithms for log analysis.
@@ -55,12 +56,13 @@ public final class LogAnalysisService {
     private final FrameFields fields;
     private final CloneScan clones;
     private final PrefixGroup prefixes;
+    private final KeyWidth keys;
 
     public LogAnalysisService() {
         this(new BannerSplitter(), new PairDrift(), new WrapReflow(), new RareClassScanner(),
                 new RareBreakTokenizer(), new KmerStamp(), new PalindromeScan(), new StemLoop(),
                 new FuzzyFind(), new BlockContrast(), new MirrorJoint(), new SeamGuard(),
-                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup());
+                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth());
     }
 
     public LogAnalysisService(
@@ -79,7 +81,8 @@ public final class LogAnalysisService {
             PhaseJoint phase,
             FrameFields fields,
             CloneScan clones,
-            PrefixGroup prefixes) {
+            PrefixGroup prefixes,
+            KeyWidth keys) {
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
@@ -96,6 +99,7 @@ public final class LogAnalysisService {
         this.fields = fields;
         this.clones = clones;
         this.prefixes = prefixes;
+        this.keys = keys;
     }
 
     /**
@@ -242,6 +246,15 @@ public final class LogAnalysisService {
                 prefixScan.wrapWidth(),
                 prefixScan.prefixLength());
 
+        var keyScan = keys.measure(payload);
+        var keySection = new LogAnalysisReport.KeySection(
+                keyScan.scanned(),
+                keyScan.wrapWidth(),
+                keyScan.floorLength(),
+                keyScan.uniqueAt(),
+                keyScan.uniqueShareAtFloor(),
+                keyScan.uniqueShareAtWrap());
+
         LogAnalysisReport report = new LogAnalysisReport(
                 API_VERSION,
                 inputLength,
@@ -262,9 +275,10 @@ public final class LogAnalysisService {
                 phaseSection,
                 fieldSection,
                 cloneSection,
-                prefixSection);
+                prefixSection,
+                keySection);
         if (log.isDebugEnabled()) {
-            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={}",
+            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={}",
                     truncated,
                     tapeSection.runCount(),
                     bannerSection.sectionCount(),
@@ -280,7 +294,8 @@ public final class LogAnalysisService {
                     phaseSection.hitCount(),
                     fieldSection.recordCount(),
                     cloneSection.cloneGroups(),
-                    prefixSection.familyCount());
+                    prefixSection.familyCount(),
+                    keySection.uniqueAt());
         }
         return report;
     }

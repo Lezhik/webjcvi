@@ -24,6 +24,7 @@ import org.webjcvi.phase.PhaseJoint;
 import org.webjcvi.frame.FrameFields;
 import org.webjcvi.clone.CloneScan;
 import org.webjcvi.prefix.PrefixGroup;
+import org.webjcvi.key.KeyWidth;
 import org.webjcvi.logs.LogAnalysisReport;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.report.DnaReport;
@@ -62,6 +63,7 @@ public class WorkspaceApiController {
     private final FrameFields fields;
     private final CloneScan clones;
     private final PrefixGroup prefixes;
+    private final KeyWidth keys;
     private final LogAnalysisService logAnalysis;
 
     public WorkspaceApiController(
@@ -84,6 +86,7 @@ public class WorkspaceApiController {
             FrameFields fields,
             CloneScan clones,
             PrefixGroup prefixes,
+            KeyWidth keys,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -104,6 +107,7 @@ public class WorkspaceApiController {
         this.fields = fields;
         this.clones = clones;
         this.prefixes = prefixes;
+        this.keys = keys;
         this.logAnalysis = logAnalysis;
     }
 
@@ -619,6 +623,34 @@ public class WorkspaceApiController {
                                 rec.put("firstOffset", hit.firstOffset());
                                 rec.put("count", hit.count());
                                 rec.put("prefix", hit.prefix());
+                                return rec;
+                            })
+                            .toList());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/keys")
+    public Mono<Map<String, Object>> measureKeys(
+            @RequestParam("text") String text,
+            @RequestParam(name = "wrap", defaultValue = "70") int wrapWidth) {
+        return Mono.fromCallable(() -> {
+                    var scan = keys.measure(text, wrapWidth);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("wrapWidth", scan.wrapWidth());
+                    body.put("floorLength", scan.floorLength());
+                    body.put("scanned", scan.scanned());
+                    body.put("uniqueAt", scan.uniqueAt());
+                    body.put("uniqueShareAtFloor", scan.uniqueShareAtFloor());
+                    body.put("uniqueShareAtWrap", scan.uniqueShareAtWrap());
+                    body.put("samples", scan.samples().stream()
+                            .map(hit -> {
+                                Map<String, Object> rec = new LinkedHashMap<>();
+                                rec.put("length", hit.length());
+                                rec.put("distinct", hit.distinct());
+                                rec.put("familyCount", hit.familyCount());
+                                rec.put("uniqueShare", hit.uniqueShare());
                                 return rec;
                             })
                             .toList());

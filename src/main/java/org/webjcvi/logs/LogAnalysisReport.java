@@ -26,7 +26,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
         "phase",
         "fields",
         "clones",
-        "prefixes"
+        "prefixes",
+        "keys"
 })
 public record LogAnalysisReport(
         int apiVersion,
@@ -48,7 +49,8 @@ public record LogAnalysisReport(
         PhaseSection phase,
         FieldSection fields,
         CloneSection clones,
-        PrefixSection prefixes) {
+        PrefixSection prefixes,
+        KeySection keys) {
 
     @JsonPropertyOrder({"length", "runCount", "longestRun"})
     public record TapeSection(int length, int runCount, int longestRun) {
@@ -153,5 +155,15 @@ public record LogAnalysisReport(
             String topPrefix,
             int wrapWidth,
             int prefixLength) {
+    }
+
+    @JsonPropertyOrder({"scanned", "wrapWidth", "floorLength", "uniqueAt", "uniqueShareAtFloor", "uniqueShareAtWrap"})
+    public record KeySection(
+            int scanned,
+            int wrapWidth,
+            int floorLength,
+            int uniqueAt,
+            double uniqueShareAtFloor,
+            double uniqueShareAtWrap) {
     }
 }

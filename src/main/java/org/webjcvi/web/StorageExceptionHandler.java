@@ -26,6 +26,7 @@ import org.webjcvi.phase.PhaseException;
 import org.webjcvi.frame.FrameException;
 import org.webjcvi.clone.CloneException;
 import org.webjcvi.prefix.PrefixException;
+import org.webjcvi.key.KeyException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
@@ -130,6 +131,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> prefix(PrefixException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "prefix", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(KeyException.class)
+    ResponseEntity<Map<String, String>> key(KeyException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "key", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

@@ -132,6 +132,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/fields");
                     assertThat(html).contains("/clones");
                     assertThat(html).contains("/prefix");
+                    assertThat(html).contains("/keys");
                 });
     }
 
@@ -846,6 +847,50 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void keyApiReportsUniqueAtNine() {
+        String a = "HEADHEAD" + "A".repeat(62);
+        String b = "HEADHEAD" + "B".repeat(62);
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/keys")
+                        .queryParam("text", a + b)
+                        .queryParam("wrap", "70")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.uniqueAt").isEqualTo(9)
+                .jsonPath("$.scanned").isEqualTo(2)
+                .jsonPath("$.floorLength").isEqualTo(8);
+    }
+
+    @Test
+    void keyPageRenders() {
+        webTestClient.get()
+                .uri("/keys")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Key width"));
+    }
+
+    @Test
+    void keyPageFormReportsUniqueAtNine() {
+        String a = "HEADHEAD" + "A".repeat(62);
+        String b = "HEADHEAD" + "B".repeat(62);
+        webTestClient.post()
+                .uri("/keys")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=" + a + b + "&wrap=70")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("uniqueAt=9");
+                    assertThat(html).contains("k 9");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -872,6 +917,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.phase.hitCount").isNumber()
                 .jsonPath("$.fields.recordCount").isNumber()
                 .jsonPath("$.clones.cloneGroups").isNumber()
-                .jsonPath("$.prefixes.familyCount").isNumber();
+                .jsonPath("$.prefixes.familyCount").isNumber()
+                .jsonPath("$.keys.uniqueAt").isNumber();
     }
 }

@@ -25,6 +25,7 @@ import org.webjcvi.phase.PhaseJoint;
 import org.webjcvi.frame.FrameFields;
 import org.webjcvi.clone.CloneScan;
 import org.webjcvi.prefix.PrefixGroup;
+import org.webjcvi.key.KeyWidth;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -128,6 +129,11 @@ public class WebJcviConfiguration {
     @Bean
     PrefixGroup prefixGroup() {
         return new PrefixGroup();
+    }
+
+    @Bean
+    KeyWidth keyWidth() {
+        return new KeyWidth();
     }
 
     @Bean

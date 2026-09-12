@@ -43,6 +43,8 @@ import org.webjcvi.clone.CloneException;
 import org.webjcvi.clone.CloneScan;
 import org.webjcvi.prefix.PrefixException;
 import org.webjcvi.prefix.PrefixGroup;
+import org.webjcvi.key.KeyException;
+import org.webjcvi.key.KeyWidth;
 import org.webjcvi.logs.LogAnalysisService;
 
 /**
@@ -72,6 +74,7 @@ public class WebJcviMcpTools {
     private final FrameFields fields;
     private final CloneScan clones;
     private final PrefixGroup prefixes;
+    private final KeyWidth keys;
     private final LogAnalysisService logAnalysis;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
@@ -79,7 +82,7 @@ public class WebJcviMcpTools {
                 new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer(), new KmerStamp(),
                 new PalindromeScan(), new StemLoop(), new FuzzyFind(), new BlockContrast(),
                 new MirrorJoint(), new SeamGuard(), new PhaseJoint(), new FrameFields(),
-                new CloneScan(), new PrefixGroup(), new LogAnalysisService());
+                new CloneScan(), new PrefixGroup(), new KeyWidth(), new LogAnalysisService());
     }
 
     @Autowired
@@ -103,6 +106,7 @@ public class WebJcviMcpTools {
             FrameFields fields,
             CloneScan clones,
             PrefixGroup prefixes,
+            KeyWidth keys,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -123,6 +127,7 @@ public class WebJcviMcpTools {
         this.fields = fields;
         this.clones = clones;
         this.prefixes = prefixes;
+        this.keys = keys;
         this.logAnalysis = logAnalysis;
     }
 
@@ -574,6 +579,29 @@ public class WebJcviMcpTools {
         });
     }
 
+    @Tool(name = "measure_key_width", description = "Find the smallest wrap-frame prefix length that uniquely identifies every record of caller-supplied text. Default wrap 70, floor 8. Newlines are dropped. Not the DNA file and not a project path.")
+    public String measureKeyWidth(
+            @ToolParam(description = "Arbitrary text to scan") String text,
+            @ToolParam(description = "Wrap frame width; use 70 unless you need a different floor") int wrapWidth) {
+        return run(() -> {
+            int wrap = wrapWidth < 8 ? KeyWidth.DEFAULT_WRAP : wrapWidth;
+            var scan = keys.measure(text, wrap);
+            StringBuilder out = new StringBuilder(scan.summary()).append('\n');
+            if (scan.samples().isEmpty()) {
+                out.append("(no wrap frames)");
+                return out.toString();
+            }
+            for (var hit : scan.samples()) {
+                out.append("k ").append(hit.length())
+                        .append(" distinct ").append(hit.distinct())
+                        .append(" families ").append(hit.familyCount())
+                        .append(" uniqueShare ").append(hit.uniqueShare())
+                        .append('\n');
+            }
+            return out.toString();
+        });
+    }
+
     @Tool(name = "analyze_logs", description = "Analyze caller-supplied log text with the shared log-analysis facade. Returns a JSON report. Not the DNA file. Truncates at 524288 characters.")
     public String analyzeLogs(
             @ToolParam(description = "Log text to analyze") String text) {
@@ -605,7 +633,7 @@ public class WebJcviMcpTools {
             return action.execute();
         } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException
                  | RareException | TokenException | StampException | FoldException | LoopException
-                 | FuzzyException | ContrastException | MirrorException | SeamException | PhaseException | FrameException | CloneException | PrefixException e) {
+                 | FuzzyException | ContrastException | MirrorException | SeamException | PhaseException | FrameException | CloneException | PrefixException | KeyException e) {
             return "Error: " + e.getMessage();
         }
     }
