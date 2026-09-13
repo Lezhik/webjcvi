@@ -8,8 +8,12 @@ available in context.
 
 Run the next iteration of the WebJCVI project, following the full iteration
 algorithm defined in AGENTS.md and docs/tz.md, in order, without skipping any
-step. Write all logs, code comments, commit messages, and any other artifacts
-in English.
+step. Write all logs, code comments, commit messages, agent-instruction files,
+and any other artifacts in English.
+
+The useful system being grown is **document and log analysis for AI agents**.
+The agent must **compare old analysis with new analysis** before writing Pros
+and Cons. Do not form a verdict from a single JSON snapshot.
 
 Pay special attention to the following requirements for this iteration:
 
@@ -20,40 +24,44 @@ Pay special attention to the following requirements for this iteration:
    reading the DNA. The resulting report must differ from all prior reports
    in both content and structure, not just in minor details.
 
-2. The web and MCP surfaces must do useful work beyond DNA itself. Both
-   surfaces must expose functionality that is genuinely useful on its own —
-   e.g. related to information processing, code analysis, memory/knowledge
-   management, or a similar domain — not only functionality for viewing or
-   serving DNA reports. DNA-related features alone are not sufficient for
-   this iteration.
+2. The web and MCP surfaces must do useful work for **document and log
+   analysis by AI agents**, beyond DNA itself. Both surfaces must expose
+   functionality that is genuinely useful on its own. DNA-related features
+   alone are not sufficient. Keep the previous text-analysis algorithm in
+   the facade; add, do not replace.
 
-3. You must construct and justify the link between the DNA and this useful
-   system. Explicitly explain why the rule(s) you extracted from the DNA
-   this iteration imply the specific useful functionality you are building.
-   This justification must be concrete: point to an actual feature of the
-   DNA (a motif, a statistical property, a structural pattern, a
-   repeat/frequency you found, etc. — surfaced by your report from step 1),
-   not a vague or after-the-fact rationalization.
+3. Before forming a new hypothesis, **read the immediately previous
+   docs/log.md entry** (hypothesis and its Pros/Cons) so the new theory
+   answers those cons. Then read the rest of the log for novelty. If
+   `docs/agent/iteration-<previous>.md` exists, read it too.
 
-4. Every change must be derived from an extracted rule, never arbitrary or
-   chosen by preference. If you cannot trace a piece of functionality back
-   to a specific rule you extracted from the DNA this iteration, do not
-   build it. Before forming your hypothesis, read the full history in
-   docs/log.md and confirm your hypothesis is meaningfully different from
-   every previous one.
+4. The hypothesis must contain **four explicit parts** (docs/tz.md §6.4):
+   DNA/text rule (pointed at a concrete signal from this iteration's DNA
+   report); usefulness for documents and logs; practical use (how an agent
+   uses it); verification criterion (pass/fail on before vs after JSON for
+   logs and for docs/tz.md). Every code change must trace back to that rule.
 
-5. Before Pros/Cons, run the full automated test suite so DEBUG logs are
-   written to reports/logs/test.log. Then call the log-analysis facade on
-   that journal and write reports/logs/report.json (Gradle analyzeLogs).
-   Do not skip this even if the journal looks empty.
+5. Before any code change, capture the **old** reports through the current
+   facade: `reports/logs/logs-before.json` (from test.log) and
+   `reports/logs/tz-before.json` (from docs/tz.md). After the code change
+   and a green test run, capture the **new** reports:
+   `reports/logs/logs-after.json` and `reports/logs/tz-after.json`. All
+   four files must exist before Pros/Cons. Also write `report.json` as a
+   copy of `logs-after.json` (Gradle analyzeLogs may produce that copy).
 
-6. Read reports/logs/report.json before writing Pros and Cons. Any claim
-   about whether the hypothesis is useful for log analysis must be grounded
-   in that JSON (what the algorithms actually found in the app's own logs),
-   not in speculation. Record that grounding in the Pros/Cons fields.
+6. Besides the code change, write **new** agent instructions at
+   `docs/agent/iteration-<index>.md`. Do not edit or delete previous
+   instruction files. The new file must include: how to use the
+   text-analysis JSON; this iteration's verification criterion; criteria
+   for checking the **previous** step.
+
+7. **Forbidden to write Pros/Cons until** the agent has read: the DEBUG
+   logs, docs/tz.md, the four JSON reports (comparing old vs new on both
+   corpora), old and new agent instructions (with criteria), and the
+   four-part hypothesis. Pros/Cons must state whether the verification
+   criterion passed, grounded in the four JSON files — not speculation.
 
 Record the iteration in docs/log.md using exactly the required format
-(Hypothesis / Functionality changes / Pros / Cons / Report builder changes),
-making sure the "Pros"/"Cons" and "Hypothesis" fields carry the DNA-to-
-functionality justification from point 3 above. Commit locally with message
+(four-part Hypothesis / Functionality changes / Agent instructions / Pros /
+Cons / Report builder changes). Commit locally with message
 "Iteration #<index> - <brief description>" — do not push.
