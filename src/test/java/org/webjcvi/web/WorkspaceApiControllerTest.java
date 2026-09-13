@@ -138,6 +138,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/lanes");
                     assertThat(html).contains("/rows");
                     assertThat(html).contains("/cliff");
+                    assertThat(html).contains("/runway");
                 });
     }
 
@@ -1109,6 +1110,46 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void runwayApiReportsZeroRunwayOnTimestampTwins() {
+        String text = "2026-09-13 21:56 worker-a\n2026-09-13 21:56 worker-b\n";
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/runway")
+                        .queryParam("text", text)
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.forkAt").isEqualTo(25)
+                .jsonPath("$.runway").isEqualTo(0)
+                .jsonPath("$.stretched").isEqualTo(false);
+    }
+
+    @Test
+    void runwayPageRenders() {
+        webTestClient.get()
+                .uri("/runway")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Layout runway"));
+    }
+
+    @Test
+    void runwayPageFormReportsZeroRunwayOnTimestampTwins() {
+        webTestClient.post()
+                .uri("/runway")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=2026-09-13 21:56 worker-a%0A2026-09-13 21:56 worker-b")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("runway=0");
+                    assertThat(html).contains("stretched=false");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -1141,6 +1182,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.affixes.cheaperEnd").exists()
                 .jsonPath("$.lanes.spread").isNumber()
                 .jsonPath("$.rows.uniqueShareAt16").isNumber()
-                .jsonPath("$.cliffs.forkAt").isNumber();
+                .jsonPath("$.cliffs.forkAt").isNumber()
+                .jsonPath("$.runways.runway").isNumber();
     }
 }

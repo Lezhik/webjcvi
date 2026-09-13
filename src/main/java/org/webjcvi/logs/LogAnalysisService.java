@@ -28,6 +28,7 @@ import org.webjcvi.affix.AffixScan;
 import org.webjcvi.lane.LaneScan;
 import org.webjcvi.row.RowScan;
 import org.webjcvi.cliff.CliffScan;
+import org.webjcvi.runway.RunwayScan;
 
 /**
  * Fixed-API facade over the text-processing algorithms for log analysis.
@@ -67,12 +68,13 @@ public final class LogAnalysisService {
     private final LaneScan lanes;
     private final RowScan rows;
     private final CliffScan cliffs;
+    private final RunwayScan runways;
 
     public LogAnalysisService() {
         this(new BannerSplitter(), new PairDrift(), new WrapReflow(), new RareClassScanner(),
                 new RareBreakTokenizer(), new KmerStamp(), new PalindromeScan(), new StemLoop(),
                 new FuzzyFind(), new BlockContrast(), new MirrorJoint(), new SeamGuard(),
-                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan());
+                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan(), new RunwayScan());
     }
 
     public LogAnalysisService(
@@ -97,7 +99,8 @@ public final class LogAnalysisService {
             AffixScan affixes,
             LaneScan lanes,
             RowScan rows,
-            CliffScan cliffs) {
+            CliffScan cliffs,
+            RunwayScan runways) {
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
@@ -120,6 +123,7 @@ public final class LogAnalysisService {
         this.lanes = lanes;
         this.rows = rows;
         this.cliffs = cliffs;
+        this.runways = runways;
     }
 
     /**
@@ -330,6 +334,20 @@ public final class LogAnalysisService {
                 cliffScan.topPrefix(),
                 cliffScan.topCount());
 
+        var runwayScan = runways.profile(payload);
+        var runwaySection = new LogAnalysisReport.RunwaySection(
+                runwayScan.lineCount(),
+                runwayScan.scanned(),
+                runwayScan.tileLength(),
+                runwayScan.forkAt(),
+                runwayScan.cliffAt(),
+                runwayScan.runway(),
+                runwayScan.stretched(),
+                runwayScan.shareAt16(),
+                runwayScan.shareAtCliff(),
+                runwayScan.topPrefix(),
+                runwayScan.topCount());
+
         LogAnalysisReport report = new LogAnalysisReport(
                 API_VERSION,
                 inputLength,
@@ -356,9 +374,10 @@ public final class LogAnalysisService {
                 affixSection,
                 laneSection,
                 rowSection,
-                cliffSection);
+                cliffSection,
+                runwaySection);
         if (log.isDebugEnabled()) {
-            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={} affixes={} lanes={} rows={} cliffs={}",
+            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={} affixes={} lanes={} rows={} cliffs={} runways={}",
                     truncated,
                     tapeSection.runCount(),
                     bannerSection.sectionCount(),
@@ -380,7 +399,8 @@ public final class LogAnalysisService {
                     affixSection.cheaperEnd(),
                     laneSection.spread(),
                     rowSection.uniqueShareAt16(),
-                    cliffSection.forkAt());
+                    cliffSection.forkAt(),
+                    runwaySection.runway());
         }
         return report;
     }

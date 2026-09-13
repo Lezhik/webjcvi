@@ -61,6 +61,7 @@ class WebJcviMcpToolsTest {
                         "profile_lanes",
                         "profile_rows",
                         "profile_cliffs",
+                        "profile_runways",
                         "analyze_logs",
                         "list_files",
                         "read_file");
@@ -110,7 +111,7 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Line forks");
+        assertThat(markdown).contains("Line runway");
         assertThat(markdown).contains("Frame remainder");
     }
 
@@ -358,6 +359,17 @@ class WebJcviMcpToolsTest {
         String result = tools.profileCliffs(text);
         assertThat(result).contains("forkAt=25");
         assertThat(result).contains("cliffAt=25");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("2026-hidden");
+    }
+
+    @Test
+    void profileRunwaysDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "2026-hidden");
+        String text = "2026-09-13 21:56 worker-a\n2026-09-13 21:56 worker-b\n";
+        String result = tools.profileRunways(text);
+        assertThat(result).contains("runway=0");
+        assertThat(result).contains("stretched=false");
         assertThat(result).doesNotContain("hidden");
         assertThat(tools.readFile("secret.txt")).isEqualTo("2026-hidden");
     }

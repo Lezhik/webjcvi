@@ -30,6 +30,7 @@ import org.webjcvi.affix.AffixScan;
 import org.webjcvi.lane.LaneScan;
 import org.webjcvi.row.RowScan;
 import org.webjcvi.cliff.CliffScan;
+import org.webjcvi.runway.RunwayScan;
 import org.webjcvi.logs.LogAnalysisReport;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.report.DnaReport;
@@ -74,6 +75,7 @@ public class WorkspaceApiController {
     private final LaneScan lanes;
     private final RowScan rows;
     private final CliffScan cliffs;
+    private final RunwayScan runways;
     private final LogAnalysisService logAnalysis;
 
     public WorkspaceApiController(
@@ -102,6 +104,7 @@ public class WorkspaceApiController {
             LaneScan lanes,
             RowScan rows,
             CliffScan cliffs,
+            RunwayScan runways,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -128,6 +131,7 @@ public class WorkspaceApiController {
         this.lanes = lanes;
         this.rows = rows;
         this.cliffs = cliffs;
+        this.runways = runways;
         this.logAnalysis = logAnalysis;
     }
 
@@ -791,6 +795,28 @@ public class WorkspaceApiController {
                     body.put("tileLength", scan.tileLength());
                     body.put("forkAt", scan.forkAt());
                     body.put("cliffAt", scan.cliffAt());
+                    body.put("shareAt16", scan.shareAt16());
+                    body.put("shareAtCliff", scan.shareAtCliff());
+                    body.put("topPrefix", scan.topPrefix());
+                    body.put("topCount", scan.topCount());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/runway")
+    public Mono<Map<String, Object>> profileRunways(
+            @RequestParam("text") String text) {
+        return Mono.fromCallable(() -> {
+                    var scan = runways.profile(text);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("lineCount", scan.lineCount());
+                    body.put("scanned", scan.scanned());
+                    body.put("tileLength", scan.tileLength());
+                    body.put("forkAt", scan.forkAt());
+                    body.put("cliffAt", scan.cliffAt());
+                    body.put("runway", scan.runway());
+                    body.put("stretched", scan.stretched());
                     body.put("shareAt16", scan.shareAt16());
                     body.put("shareAtCliff", scan.shareAtCliff());
                     body.put("topPrefix", scan.topPrefix());

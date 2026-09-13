@@ -32,6 +32,7 @@ import org.webjcvi.affix.AffixException;
 import org.webjcvi.lane.LaneException;
 import org.webjcvi.row.RowException;
 import org.webjcvi.cliff.CliffException;
+import org.webjcvi.runway.RunwayException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
@@ -172,6 +173,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> cliff(CliffException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "cliff", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(RunwayException.class)
+    ResponseEntity<Map<String, String>> runway(RunwayException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "runway", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

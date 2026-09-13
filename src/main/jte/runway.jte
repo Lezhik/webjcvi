@@ -5,6 +5,8 @@
 @param int rowCount
 @param int forkAt
 @param int cliffAt
+@param int runway
+@param boolean stretched
 @param double shareAt16
 @param double shareAtCliff
 @param String topPrefix
@@ -14,7 +16,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Clock cliff — WebJCVI</title>
+    <title>Layout runway — WebJCVI</title>
     <style>
         :root { color-scheme: light dark; }
         body { font-family: Georgia, serif; max-width: 52rem; margin: 2rem auto; padding: 0 1.25rem; line-height: 1.5; }
@@ -29,23 +31,23 @@
     </style>
 </head>
 <body>
-    <nav><a href="/">← Home</a> · <a href="/tape">Scratch tape</a> · <a href="/split">Banner split</a> · <a href="/drift">Pair drift</a> · <a href="/reflow">Unwrap</a> · <a href="/rare">Rare islands</a> · <a href="/tokens">Tokens</a> · <a href="/stamps">Stamps</a> · <a href="/fold">Fold</a> · <a href="/loop">Loops</a> · <a href="/fuzzy">Fuzzy</a> · <a href="/contrast">Contrast</a> · <a href="/mirror">Mirrors</a> · <a href="/seam">Seams</a> · <a href="/phase">Phase</a> · <a href="/fields">Fields</a> · <a href="/clones">Clones</a> · <a href="/prefix">Prefixes</a> · <a href="/keys">Keys</a> · <a href="/forks">Forks</a> · <a href="/affix">Affix</a> · <a href="/lanes">Lanes</a> · <a href="/rows">Rows</a> · <a href="/runway">Runway</a></nav>
-    <h1>Clock cliff</h1>
-    <p>Keep newlines. DNA line uniqueness jumps from k=8 share <strong>0.7191</strong>
-        to k=16 <strong>0.9997</strong> (uniqueAt 20). Log lines that share a
-        16-character clock never saturate. Report <code>forkAt</code> (first
-        column where the largest colliding prefix splits) and
-        <code>cliffAt</code> (smallest k with unique share ≥ 0.99). Inverse of
-        line records (there uniqueShareAt16 was the veto). Not
+    <nav><a href="/">← Home</a> · <a href="/tape">Scratch tape</a> · <a href="/split">Banner split</a> · <a href="/drift">Pair drift</a> · <a href="/reflow">Unwrap</a> · <a href="/rare">Rare islands</a> · <a href="/tokens">Tokens</a> · <a href="/stamps">Stamps</a> · <a href="/fold">Fold</a> · <a href="/loop">Loops</a> · <a href="/fuzzy">Fuzzy</a> · <a href="/contrast">Contrast</a> · <a href="/mirror">Mirrors</a> · <a href="/seam">Seams</a> · <a href="/phase">Phase</a> · <a href="/fields">Fields</a> · <a href="/clones">Clones</a> · <a href="/prefix">Prefixes</a> · <a href="/keys">Keys</a> · <a href="/forks">Forks</a> · <a href="/affix">Affix</a> · <a href="/lanes">Lanes</a> · <a href="/rows">Rows</a> · <a href="/cliff">Cliff</a></nav>
+    <h1>Layout runway</h1>
+    <p>Keep newlines. DNA residual twins fork at uniqueAt (<strong>19–20</strong>).
+        Log lines often fork just past a 16-character clock while uniqueness
+        only cliffs much later. Report <code>runway = cliffAt − forkAt</code>.
+        If <code>stretched</code> (runway &gt; 20), start an identifier at
+        <code>cliffAt</code>, not at <code>forkAt</code>. Inverse of clock-cliff
+        (there forkAt was the start column). Not
         <code>jcvi-dna.txt</code>, not a project file.</p>
 
-    <form method="post" action="/cliff">
+    <form method="post" action="/runway">
         <p>
             <label>Text (max ${maxChars} characters)<br>
                 <textarea name="text" required></textarea>
             </label>
         </p>
-        <p><button type="submit">Profile cliff</button></p>
+        <p><button type="submit">Profile runway</button></p>
     </form>
 
     @if(scanned)
@@ -55,8 +57,9 @@
         @else
             <p>${lineCount} line(s), ${rowCount} record(s). forkAt
                 <code>${forkAt}</code>, cliffAt <code>${cliffAt}</code>,
-                share at 16 <code>${shareAt16}</code>, share at cliff
-                <code>${shareAtCliff}</code>. Top prefix
+                runway <code>${runway}</code>, stretched
+                <code>${stretched}</code>, share at 16
+                <code>${shareAt16}</code>. Top prefix
                 <code>${topPrefix}</code> × <code>${topCount}</code>.</p>
         @endif
     @endif

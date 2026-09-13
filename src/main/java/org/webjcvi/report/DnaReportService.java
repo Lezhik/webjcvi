@@ -38,6 +38,7 @@ import org.webjcvi.dna.InteriorCensus;
 import org.webjcvi.dna.LandscapeCensus;
 import org.webjcvi.dna.LineKeyCensus;
 import org.webjcvi.dna.LineForkCensus;
+import org.webjcvi.dna.LineRunwayCensus;
 import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.storage.StorageNotFoundException;
 import org.slf4j.Logger;
@@ -137,10 +138,11 @@ public final class DnaReportService {
         LandscapeCensus landscape = LandscapeCensus.from(sequence, wraps.modalWidth());
         LineKeyCensus lineKeys = LineKeyCensus.fromRaw(raw);
         LineForkCensus lineForks = LineForkCensus.fromRaw(raw);
+        LineRunwayCensus lineRunways = LineRunwayCensus.fromRaw(raw);
         Map<String, String> sections = buildSections(
-                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks);
+                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks, lineRunways);
         String markdown = renderMarkdown(
-                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks);
+                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks, lineRunways);
         storage.writeText(reportRelativePath(), markdown);
         if (log.isDebugEnabled()) {
             log.debug("dna-report.regenerate.done bases={} markdownChars={} path={}",
@@ -211,7 +213,8 @@ public final class DnaReportService {
             InteriorCensus interior,
             LandscapeCensus landscape,
             LineKeyCensus lineKeys,
-            LineForkCensus lineForks) {
+            LineForkCensus lineForks,
+            LineRunwayCensus lineRunways) {
         Map<String, String> sections = new LinkedHashMap<>();
         sections.put("meta", "generatedAt=" + ISO.format(generatedAt));
         sections.put("length", Integer.toString(sequence.length()));
@@ -220,10 +223,10 @@ public final class DnaReportService {
         sections.put("invalidTotal", Long.toString(sequence.invalidTotal()));
         sections.put("javaSourceCount", Integer.toString(javaSources.size()));
         sections.put("wrapModalWidth", Integer.toString(wraps.modalWidth()));
-        sections.put("lineTwinGroups", Integer.toString(lineForks.twinGroups()));
-        sections.put("lineMinFork", Integer.toString(lineForks.minFork()));
-        sections.put("lineModalFork", Integer.toString(lineForks.modalFork()));
-        sections.put("lineMaxFork", Integer.toString(lineForks.maxFork()));
+        sections.put("lineCliffAt", Integer.toString(lineRunways.cliffAt()));
+        sections.put("lineModalFork", Integer.toString(lineRunways.modalFork()));
+        sections.put("lineRunway", Integer.toString(lineRunways.runway()));
+        sections.put("lineOverhang", Integer.toString(lineRunways.overhang()));
         sections.put("lineUniqueAt", Integer.toString(lineKeys.uniqueAt()));
         sections.put("lineShareAt16", String.format(Locale.ROOT, "%.4f", lineKeys.shareAt(16)));
         sections.put("longestHomopolymer", runs.longestBase() + "x" + runs.longestLength());
@@ -259,16 +262,17 @@ public final class DnaReportService {
             InteriorCensus interior,
             LandscapeCensus landscape,
             LineKeyCensus lineKeys,
-            LineForkCensus lineForks) {
+            LineForkCensus lineForks,
+            LineRunwayCensus lineRunways) {
         StringBuilder md = new StringBuilder();
         md.append("# WebJCVI DNA Report\n\n");
         md.append("Generated at **").append(ISO.format(generatedAt.atOffset(ZoneOffset.UTC))).append("**.\n\n");
         md.append("This report is rebuilt from `").append(dnaRelativePath)
-                .append("` and a snapshot of the current codebase. Version 24 of the builder ")
-                .append("walks first-difference columns of colliding source-line 16-prefixes. ")
-                .append("v23 line keys jump k=8 0.7191 → k=16 0.9997 (uniqueAt 20); ")
-                .append("log journals then forked at column 18 with cliffAt 113. ")
-                .append("This asks where residual FASTA line-twins fork when newlines are kept.\n\n");
+                .append("` and a snapshot of the current codebase. Version 25 of the builder ")
+                .append("walks the gap between the line uniqueness cliff (share ≥ 0.99) and residual twin forks. ")
+                .append("v24 residual twins fork at uniqueAt (min/modal/max 19/19/20); ")
+                .append("log journals then lost the 0.99 cliff (cliffAt=0) while forkAt sat at 18. ")
+                .append("This asks whether FASTA uniqueness cliffs before twins fork (overhang) or a layout body sits between them (runway).\n\n");
 
         md.append("## Sequence composition\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
@@ -309,35 +313,29 @@ public final class DnaReportService {
         md.append("First ").append(PREVIEW_BASES).append(" normalized bases:\n\n```\n");
         md.append(sequence.preview(PREVIEW_BASES)).append("\n```\n\n");
 
-        md.append("## Line forks\n\n");
-        md.append("Source lines kept. Colliding 16-character prefixes, with **forkAt** the 1-based first ")
-                .append("difference inside each twin group. If modalFork is 17–20, wrapping is identity with ")
-                .append("concatenated uniqueAt=20; if modalFork is 0, remaining twins are identical lines.\n\n");
+        md.append("## Line runway\n\n");
+        md.append("Source lines kept. **cliffAt** is the smallest k≥8 whose unique share is ≥ 0.99. ")
+                .append("**modalFork** is the mode first-difference of colliding 16-prefixes. ")
+                .append("**runway** is cliffAt − modalFork when the cliff is past the fork; ")
+                .append("**overhang** is modalFork − cliffAt when residual twins split after uniqueness already cliffs. ")
+                .append("DNA-tight text has overhang and runway 0; a log-like layout body has runway > 20.\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
-        md.append("| Lines | ").append(lineForks.lines()).append(" |\n");
-        md.append("| Tile length | ").append(lineForks.tileLength()).append(" |\n");
-        md.append("| Twin groups | ").append(lineForks.twinGroups()).append(" |\n");
-        md.append("| Twin lines | ").append(lineForks.twinLines()).append(" |\n");
-        md.append("| Min fork | ").append(lineForks.minFork()).append(" |\n");
-        md.append("| Modal fork | ").append(lineForks.modalFork()).append(" |\n");
-        md.append("| Max fork | ").append(lineForks.maxFork()).append(" |\n\n");
-        md.append("`").append(lineForks.toTextRow()).append("`\n\n");
-        if (!lineForks.hits().isEmpty()) {
-            md.append("| Prefix | Count | forkAt |\n| --- | --- | --- |\n");
-            int shown = 0;
-            for (LineForkCensus.Hit hit : lineForks.hits()) {
-                if (shown >= 20) {
-                    break;
-                }
-                md.append("| `").append(hit.prefix()).append("` | ")
-                        .append(hit.count()).append(" | ").append(hit.forkAt()).append(" |\n");
-                shown++;
-            }
-            md.append('\n');
-        }
+        md.append("| Lines | ").append(lineRunways.lines()).append(" |\n");
+        md.append("| Tile length | ").append(lineRunways.tileLength()).append(" |\n");
+        md.append("| Cliff at (k) | ").append(lineRunways.cliffAt()).append(" |\n");
+        md.append("| Share at cliff | ").append(String.format(Locale.ROOT, "%.4f", lineRunways.shareAtCliff())).append(" |\n");
+        md.append("| Modal fork | ").append(lineRunways.modalFork()).append(" |\n");
+        md.append("| Runway | ").append(lineRunways.runway()).append(" |\n");
+        md.append("| Overhang | ").append(lineRunways.overhang()).append(" |\n\n");
+        md.append("`").append(lineRunways.toTextRow()).append("`\n\n");
 
         md.append("## Frame remainder\n\n");
-        md.append("Line-key remainder: uniqueAt **").append(lineKeys.uniqueAt())
+        md.append("Line-fork remainder: twin groups **").append(lineForks.twinGroups())
+                .append("**, twin lines **").append(lineForks.twinLines())
+                .append("**, minFork **").append(lineForks.minFork())
+                .append("**, modalFork **").append(lineForks.modalFork())
+                .append("**, maxFork **").append(lineForks.maxFork())
+                .append("**. Line-key remainder: uniqueAt **").append(lineKeys.uniqueAt())
                 .append("**, unique share k=8 **")
                 .append(String.format(Locale.ROOT, "%.4f", lineKeys.shareAt(8)))
                 .append("**, k=16 **")
@@ -438,7 +436,7 @@ public final class DnaReportService {
                 .append("**.\n\n");
 
         md.append("## Extracted tape rules\n\n");
-        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks);
+        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks, lineRunways);
 
         md.append("## Codebase snapshot\n\n");
         md.append(javaSources.size()).append(" Java source files under `src/main/java`:\n\n");
@@ -453,16 +451,16 @@ public final class DnaReportService {
 
         md.append("## Growth notes for the next iteration\n\n");
         md.append("- Dominant canonical base: **").append(dominantBase(sequence)).append("**.\n");
-        md.append("- Line forks: twin groups **").append(lineForks.twinGroups())
-                .append("** covering **").append(lineForks.twinLines())
-                .append("** of **").append(lineForks.lines())
-                .append("** lines; minFork **").append(lineForks.minFork())
-                .append("**, modalFork **").append(lineForks.modalFork())
-                .append("**, maxFork **").append(lineForks.maxFork())
-                .append("**. Line uniqueAt remainder **").append(lineKeys.uniqueAt())
-                .append("** (k=16 share **")
-                .append(String.format(Locale.ROOT, "%.4f", lineKeys.shareAt(16)))
-                .append("**). If modalFork is just past 16, residual twins are near-uniqueAt; if 0, remaining collisions are identical lines.\n");
+        md.append("- Line runway: cliffAt **").append(lineRunways.cliffAt())
+                .append("** (share **")
+                .append(String.format(Locale.ROOT, "%.4f", lineRunways.shareAtCliff()))
+                .append("**), modalFork **").append(lineRunways.modalFork())
+                .append("**, runway **").append(lineRunways.runway())
+                .append("**, overhang **").append(lineRunways.overhang())
+                .append("**. Line-fork remainder: twin groups **").append(lineForks.twinGroups())
+                .append("** min/max **").append(lineForks.minFork())
+                .append("/").append(lineForks.maxFork())
+                .append("**. If overhang > 0, uniqueness cliffs before residual twins split; if runway > 20, a log-like layout body sits between them.\n");
         md.append("- Reverse-only remainder: wrap/mean **")
                 .append(String.format(Locale.ROOT, "%.3f", phases.wrapVsMean()))
                 .append("**.\n");
@@ -504,17 +502,22 @@ public final class DnaReportService {
             InteriorCensus interior,
             LandscapeCensus landscape,
             LineKeyCensus lineKeys,
-            LineForkCensus lineForks) {
+            LineForkCensus lineForks,
+            LineRunwayCensus lineRunways) {
         long a = sequence.canonicalCounts().getOrDefault('A', 0L);
         long t = sequence.canonicalCounts().getOrDefault('T', 0L);
-        md.append("1. **R1 Line forks.** Lines ").append(lineForks.lines())
-                .append(" twinGroups ").append(lineForks.twinGroups())
-                .append(" twinLines ").append(lineForks.twinLines())
-                .append(" minFork ").append(lineForks.minFork())
-                .append(" modalFork ").append(lineForks.modalFork())
-                .append(" maxFork ").append(lineForks.maxFork())
+        md.append("1. **R1 Line runway.** Lines ").append(lineRunways.lines())
+                .append(" cliffAt ").append(lineRunways.cliffAt())
+                .append(" shareCliff ")
+                .append(String.format(Locale.ROOT, "%.4f", lineRunways.shareAtCliff()))
+                .append(" modalFork ").append(lineRunways.modalFork())
+                .append(" runway ").append(lineRunways.runway())
+                .append(" overhang ").append(lineRunways.overhang())
                 .append(".\n");
-        md.append("2. **R2 Line-key/landscape remainder.** uniqueAt ").append(lineKeys.uniqueAt())
+        md.append("2. **R2 Line-fork/key remainder.** twinGroups ").append(lineForks.twinGroups())
+                .append(" minFork ").append(lineForks.minFork())
+                .append(" maxFork ").append(lineForks.maxFork())
+                .append("; uniqueAt ").append(lineKeys.uniqueAt())
                 .append(" share k=8 ")
                 .append(String.format(Locale.ROOT, "%.4f", lineKeys.shareAt(8)))
                 .append(" k=16 ")

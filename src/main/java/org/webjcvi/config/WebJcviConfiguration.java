@@ -31,6 +31,7 @@ import org.webjcvi.affix.AffixScan;
 import org.webjcvi.lane.LaneScan;
 import org.webjcvi.row.RowScan;
 import org.webjcvi.cliff.CliffScan;
+import org.webjcvi.runway.RunwayScan;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -164,6 +165,11 @@ public class WebJcviConfiguration {
     @Bean
     CliffScan cliffScan() {
         return new CliffScan();
+    }
+
+    @Bean
+    RunwayScan runwayScan() {
+        return new RunwayScan();
     }
 
     @Bean

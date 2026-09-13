@@ -40,7 +40,8 @@ class LogAnalysisServiceTest {
             "affixes",
             "lanes",
             "rows",
-            "cliffs");
+            "cliffs",
+            "runways");
 
     private static final List<String> TAPE_KEYS = List.of("length", "runCount", "longestRun");
     private static final List<String> BANNER_KEYS = List.of("sectionCount", "minRun");
@@ -79,6 +80,9 @@ class LogAnalysisServiceTest {
     private static final List<String> CLIFF_KEYS = List.of(
             "lineCount", "scanned", "tileLength", "forkAt", "cliffAt",
             "shareAt16", "shareAtCliff", "topPrefix", "topCount");
+    private static final List<String> RUNWAY_KEYS = List.of(
+            "lineCount", "scanned", "tileLength", "forkAt", "cliffAt",
+            "runway", "stretched", "shareAt16", "shareAtCliff", "topPrefix", "topCount");
 
     private final LogAnalysisService service = new LogAnalysisService();
     private final ObjectMapper mapper = new ObjectMapper();
@@ -130,6 +134,7 @@ class LogAnalysisServiceTest {
         assertThat(root.get("lanes").fieldNames()).toIterable().containsExactlyElementsOf(LANE_KEYS);
         assertThat(root.get("rows").fieldNames()).toIterable().containsExactlyElementsOf(ROW_KEYS);
         assertThat(root.get("cliffs").fieldNames()).toIterable().containsExactlyElementsOf(CLIFF_KEYS);
+        assertThat(root.get("runways").fieldNames()).toIterable().containsExactlyElementsOf(RUNWAY_KEYS);
         assertThat(root.get("tape").get("length").intValue()).isEqualTo(sample.length());
         assertThat(root.get("banners").get("sectionCount").intValue()).isGreaterThanOrEqualTo(1);
         assertThat(root.get("spans").get("spanCount").intValue()).isGreaterThanOrEqualTo(1);
