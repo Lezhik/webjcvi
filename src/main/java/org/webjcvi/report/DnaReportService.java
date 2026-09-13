@@ -34,6 +34,7 @@ import org.webjcvi.dna.CloneCensus;
 import org.webjcvi.dna.PrefixCensus;
 import org.webjcvi.dna.KeyWidthCensus;
 import org.webjcvi.dna.SuffixCensus;
+import org.webjcvi.dna.InteriorCensus;
 import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.storage.StorageNotFoundException;
 import org.slf4j.Logger;
@@ -129,10 +130,11 @@ public final class DnaReportService {
         PrefixCensus prefixCensus = PrefixCensus.from(sequence, wraps.modalWidth());
         KeyWidthCensus keyWidth = KeyWidthCensus.from(sequence, wraps.modalWidth());
         SuffixCensus suffixCensus = SuffixCensus.from(sequence, wraps.modalWidth());
+        InteriorCensus interior = InteriorCensus.from(sequence, wraps.modalWidth());
         Map<String, String> sections = buildSections(
-                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus);
+                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior);
         String markdown = renderMarkdown(
-                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus);
+                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior);
         storage.writeText(reportRelativePath(), markdown);
         if (log.isDebugEnabled()) {
             log.debug("dna-report.regenerate.done bases={} markdownChars={} path={}",
@@ -199,7 +201,8 @@ public final class DnaReportService {
             CloneCensus cloneCensus,
             PrefixCensus prefixCensus,
             KeyWidthCensus keyWidth,
-            SuffixCensus suffixCensus) {
+            SuffixCensus suffixCensus,
+            InteriorCensus interior) {
         Map<String, String> sections = new LinkedHashMap<>();
         sections.put("meta", "generatedAt=" + ISO.format(generatedAt));
         sections.put("length", Integer.toString(sequence.length()));
@@ -208,10 +211,12 @@ public final class DnaReportService {
         sections.put("invalidTotal", Long.toString(sequence.invalidTotal()));
         sections.put("javaSourceCount", Integer.toString(javaSources.size()));
         sections.put("wrapModalWidth", Integer.toString(wraps.modalWidth()));
+        sections.put("midUniqueAt", Integer.toString(interior.uniqueAt()));
+        sections.put("midShareAt8", String.format(Locale.ROOT, "%.4f", interior.shareAt(8)));
+        sections.put("midShareAt16", String.format(Locale.ROOT, "%.4f", interior.shareAt(16)));
+        sections.put("midShareAt20", String.format(Locale.ROOT, "%.4f", interior.shareAt(20)));
+        sections.put("midStartAt16", Integer.toString(interior.midStartAt16()));
         sections.put("tailUniqueAt", Integer.toString(suffixCensus.uniqueAt()));
-        sections.put("tailShareAt8", String.format(Locale.ROOT, "%.4f", suffixCensus.shareAt(8)));
-        sections.put("tailShareAt16", String.format(Locale.ROOT, "%.4f", suffixCensus.shareAt(16)));
-        sections.put("tailShareAt20", String.format(Locale.ROOT, "%.4f", suffixCensus.shareAt(20)));
         sections.put("leadUniqueAt", Integer.toString(keyWidth.uniqueAt()));
         sections.put("longestHomopolymer", runs.longestBase() + "x" + runs.longestLength());
         return sections;
@@ -242,15 +247,16 @@ public final class DnaReportService {
             CloneCensus cloneCensus,
             PrefixCensus prefixCensus,
             KeyWidthCensus keyWidth,
-            SuffixCensus suffixCensus) {
+            SuffixCensus suffixCensus,
+            InteriorCensus interior) {
         StringBuilder md = new StringBuilder();
         md.append("# WebJCVI DNA Report\n\n");
         md.append("Generated at **").append(ISO.format(generatedAt.atOffset(ZoneOffset.UTC))).append("**.\n\n");
         md.append("This report is rebuilt from `").append(dnaRelativePath)
-                .append("` and a snapshot of the current codebase. Version 20 of the builder ")
-                .append("walks unique share of wrap-frame <em>trailing</em> tiles. v19 showed ")
-                .append("leading uniqueAt=20 with a sharp jump by k=16 (0.9997); this asks ")
-                .append("whether the identifier is front-loaded or the same entropy at the tail.\n\n");
+                .append("` and a snapshot of the current codebase. Version 21 of the builder ")
+                .append("walks unique share of wrap-frame <em>centered</em> tiles. v20 showed ")
+                .append("tail uniqueAt=17 vs lead uniqueAt=20 with matching k=8/16 shares; ")
+                .append("this asks whether uniqueness is edges-only or the same entropy in the interior.\n\n");
 
         md.append("## Sequence composition\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
@@ -291,26 +297,35 @@ public final class DnaReportService {
         md.append("First ").append(PREVIEW_BASES).append(" normalized bases:\n\n```\n");
         md.append(sequence.preview(PREVIEW_BASES)).append("\n```\n\n");
 
-        md.append("## Trailing keys\n\n");
-        md.append("Non-overlapping wrap frames of width **").append(suffixCensus.wrapWidth())
-                .append("**. Unique share of a <em>trailing</em> suffix of length k, from floor **")
-                .append(suffixCensus.floorLength())
-                .append("**. **uniqueAt** is the smallest trailing k whose unique share is 1.0. ")
-                .append("If tail uniqueAt ≈ leading uniqueAt (20), uniqueness is entropy; ")
-                .append("if the tail collides farther, the key is front-loaded.\n\n");
+        md.append("## Interior keys\n\n");
+        md.append("Non-overlapping wrap frames of width **").append(interior.wrapWidth())
+                .append("**. Unique share of a <em>centered</em> tile of length k, from floor **")
+                .append(interior.floorLength())
+                .append("**. The k=16 window starts at column **").append(interior.midStartAt16())
+                .append("**. **uniqueAt** is the smallest centered k whose unique share is 1.0. ")
+                .append("If mid uniqueAt ≈ tail uniqueAt (17) and lead uniqueAt (20), uniqueness is entropy; ")
+                .append("if the middle collides farther, the key lives at the edges.\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
-        md.append("| Frames | ").append(suffixCensus.frames()).append(" |\n");
-        md.append("| Tail unique at (k) | ").append(suffixCensus.uniqueAt()).append(" |\n");
-        for (SuffixCensus.Row row : suffixCensus.samples()) {
-            md.append("| Tail unique share k=").append(row.length()).append(" | ")
+        md.append("| Frames | ").append(interior.frames()).append(" |\n");
+        md.append("| Mid unique at (k) | ").append(interior.uniqueAt()).append(" |\n");
+        md.append("| Mid-16 start column | ").append(interior.midStartAt16()).append(" |\n");
+        for (InteriorCensus.Row row : interior.samples()) {
+            md.append("| Mid unique share k=").append(row.length()).append(" | ")
                     .append(String.format(Locale.ROOT, "%.4f", row.uniqueShare()))
                     .append(" (").append(row.distinct()).append(" distinct) |\n");
         }
         md.append('\n');
-        md.append("`").append(suffixCensus.toTextRow()).append("`\n\n");
+        md.append("`").append(interior.toTextRow()).append("`\n\n");
 
         md.append("## Frame remainder\n\n");
-        md.append("Leading-key remainder: uniqueAt **").append(keyWidth.uniqueAt())
+        md.append("Trailing-key remainder: uniqueAt **").append(suffixCensus.uniqueAt())
+                .append("**, unique share k=8 **")
+                .append(String.format(Locale.ROOT, "%.4f", suffixCensus.shareAt(8)))
+                .append("**, k=16 **")
+                .append(String.format(Locale.ROOT, "%.4f", suffixCensus.shareAt(16)))
+                .append("**, k=20 **")
+                .append(String.format(Locale.ROOT, "%.4f", suffixCensus.shareAt(20)))
+                .append("**. Leading-key remainder: uniqueAt **").append(keyWidth.uniqueAt())
                 .append("**, unique share k=8 **")
                 .append(String.format(Locale.ROOT, "%.4f", keyWidth.shareAt(8)))
                 .append("**, k=16 **")
@@ -385,7 +400,7 @@ public final class DnaReportService {
                 .append("**.\n\n");
 
         md.append("## Extracted tape rules\n\n");
-        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus);
+        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior);
 
         md.append("## Codebase snapshot\n\n");
         md.append(javaSources.size()).append(" Java source files under `src/main/java`:\n\n");
@@ -400,16 +415,18 @@ public final class DnaReportService {
 
         md.append("## Growth notes for the next iteration\n\n");
         md.append("- Dominant canonical base: **").append(dominantBase(sequence)).append("**.\n");
-        md.append("- Trailing keys: uniqueAt **").append(suffixCensus.uniqueAt())
-                .append("** of wrap **").append(suffixCensus.wrapWidth())
-                .append("**; unique share k=8 **")
-                .append(String.format(Locale.ROOT, "%.4f", suffixCensus.shareAt(8)))
+        md.append("- Interior keys: uniqueAt **").append(interior.uniqueAt())
+                .append("** of wrap **").append(interior.wrapWidth())
+                .append("** (k=16 starts at column **").append(interior.midStartAt16())
+                .append("**); unique share k=8 **")
+                .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(8)))
                 .append("**, k=16 **")
-                .append(String.format(Locale.ROOT, "%.4f", suffixCensus.shareAt(16)))
+                .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(16)))
                 .append("**, k=20 **")
-                .append(String.format(Locale.ROOT, "%.4f", suffixCensus.shareAt(20)))
-                .append("**. Leading uniqueAt remainder **").append(keyWidth.uniqueAt())
-                .append("**. If tail ≈ lead, uniqueness is entropy; if tail is larger, the key is front-loaded.\n");
+                .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(20)))
+                .append("**. Tail uniqueAt remainder **").append(suffixCensus.uniqueAt())
+                .append("**; lead uniqueAt remainder **").append(keyWidth.uniqueAt())
+                .append("**. If mid ≈ tail ≈ lead, uniqueness is entropy; if mid is larger, the key is at the edges.\n");
         md.append("- Reverse-only remainder: wrap/mean **")
                 .append(String.format(Locale.ROOT, "%.3f", phases.wrapVsMean()))
                 .append("**.\n");
@@ -447,25 +464,31 @@ public final class DnaReportService {
             CloneCensus cloneCensus,
             PrefixCensus prefixCensus,
             KeyWidthCensus keyWidth,
-            SuffixCensus suffixCensus) {
+            SuffixCensus suffixCensus,
+            InteriorCensus interior) {
         long a = sequence.canonicalCounts().getOrDefault('A', 0L);
         long t = sequence.canonicalCounts().getOrDefault('T', 0L);
-        md.append("1. **R1 Trailing keys.** Frames ").append(suffixCensus.frames())
-                .append(" tail uniqueAt ").append(suffixCensus.uniqueAt())
-                .append(" wrap ").append(suffixCensus.wrapWidth())
-                .append("; tail unique share k=8 ")
+        md.append("1. **R1 Interior keys.** Frames ").append(interior.frames())
+                .append(" mid uniqueAt ").append(interior.uniqueAt())
+                .append(" wrap ").append(interior.wrapWidth())
+                .append(" midStart16 ").append(interior.midStartAt16())
+                .append("; mid unique share k=8 ")
+                .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(8)))
+                .append(" k=16 ")
+                .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(16)))
+                .append(" k=20 ")
+                .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(20)))
+                .append(" k=24 ")
+                .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(24)))
+                .append(" k=70 ")
+                .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(70)))
+                .append(".\n");
+        md.append("2. **R2 Trailing/leading remainder.** Tail uniqueAt ").append(suffixCensus.uniqueAt())
+                .append(" share k=8 ")
                 .append(String.format(Locale.ROOT, "%.4f", suffixCensus.shareAt(8)))
                 .append(" k=16 ")
                 .append(String.format(Locale.ROOT, "%.4f", suffixCensus.shareAt(16)))
-                .append(" k=20 ")
-                .append(String.format(Locale.ROOT, "%.4f", suffixCensus.shareAt(20)))
-                .append(" k=24 ")
-                .append(String.format(Locale.ROOT, "%.4f", suffixCensus.shareAt(24)))
-                .append(" k=70 ")
-                .append(String.format(Locale.ROOT, "%.4f", suffixCensus.shareAt(70)))
-                .append(".\n");
-        md.append("2. **R2 Leading-key remainder.** Frames ").append(keyWidth.frames())
-                .append(" uniqueAt ").append(keyWidth.uniqueAt())
+                .append("; lead uniqueAt ").append(keyWidth.uniqueAt())
                 .append(" wrap ").append(keyWidth.wrapWidth())
                 .append("; unique share k=8 ")
                 .append(String.format(Locale.ROOT, "%.4f", keyWidth.shareAt(8)))

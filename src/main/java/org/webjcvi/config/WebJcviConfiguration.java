@@ -27,6 +27,7 @@ import org.webjcvi.clone.CloneScan;
 import org.webjcvi.prefix.PrefixGroup;
 import org.webjcvi.key.KeyWidth;
 import org.webjcvi.fork.ForkScan;
+import org.webjcvi.affix.AffixScan;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -140,6 +141,11 @@ public class WebJcviConfiguration {
     @Bean
     ForkScan forkScan() {
         return new ForkScan();
+    }
+
+    @Bean
+    AffixScan affixScan() {
+        return new AffixScan();
     }
 
     @Bean

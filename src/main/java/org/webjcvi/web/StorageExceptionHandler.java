@@ -28,6 +28,7 @@ import org.webjcvi.clone.CloneException;
 import org.webjcvi.prefix.PrefixException;
 import org.webjcvi.key.KeyException;
 import org.webjcvi.fork.ForkException;
+import org.webjcvi.affix.AffixException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
@@ -144,6 +145,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> fork(ForkException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "fork", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(AffixException.class)
+    ResponseEntity<Map<String, String>> affix(AffixException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "affix", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

@@ -24,6 +24,7 @@ import org.webjcvi.clone.CloneScan;
 import org.webjcvi.prefix.PrefixGroup;
 import org.webjcvi.key.KeyWidth;
 import org.webjcvi.fork.ForkScan;
+import org.webjcvi.affix.AffixScan;
 
 /**
  * Fixed-API facade over the text-processing algorithms for log analysis.
@@ -59,12 +60,13 @@ public final class LogAnalysisService {
     private final PrefixGroup prefixes;
     private final KeyWidth keys;
     private final ForkScan forks;
+    private final AffixScan affixes;
 
     public LogAnalysisService() {
         this(new BannerSplitter(), new PairDrift(), new WrapReflow(), new RareClassScanner(),
                 new RareBreakTokenizer(), new KmerStamp(), new PalindromeScan(), new StemLoop(),
                 new FuzzyFind(), new BlockContrast(), new MirrorJoint(), new SeamGuard(),
-                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan());
+                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan());
     }
 
     public LogAnalysisService(
@@ -85,7 +87,8 @@ public final class LogAnalysisService {
             CloneScan clones,
             PrefixGroup prefixes,
             KeyWidth keys,
-            ForkScan forks) {
+            ForkScan forks,
+            AffixScan affixes) {
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
@@ -104,6 +107,7 @@ public final class LogAnalysisService {
         this.prefixes = prefixes;
         this.keys = keys;
         this.forks = forks;
+        this.affixes = affixes;
     }
 
     /**
@@ -269,6 +273,16 @@ public final class LogAnalysisService {
                 forkScan.uniqueShare(),
                 forkScan.topFork());
 
+        var affixScan = affixes.measure(payload);
+        var affixSection = new LogAnalysisReport.AffixSection(
+                affixScan.scanned(),
+                affixScan.wrapWidth(),
+                affixScan.leadUniqueAt(),
+                affixScan.tailUniqueAt(),
+                affixScan.cheaperEnd(),
+                affixScan.leadShareAtNear(),
+                affixScan.tailShareAtNear());
+
         LogAnalysisReport report = new LogAnalysisReport(
                 API_VERSION,
                 inputLength,
@@ -291,9 +305,10 @@ public final class LogAnalysisService {
                 cloneSection,
                 prefixSection,
                 keySection,
-                forkSection);
+                forkSection,
+                affixSection);
         if (log.isDebugEnabled()) {
-            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={}",
+            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={} affixes={}",
                     truncated,
                     tapeSection.runCount(),
                     bannerSection.sectionCount(),
@@ -311,7 +326,8 @@ public final class LogAnalysisService {
                     cloneSection.cloneGroups(),
                     prefixSection.familyCount(),
                     keySection.uniqueAt(),
-                    forkSection.twinCount());
+                    forkSection.twinCount(),
+                    affixSection.cheaperEnd());
         }
         return report;
     }

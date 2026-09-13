@@ -134,6 +134,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/prefix");
                     assertThat(html).contains("/keys");
                     assertThat(html).contains("/forks");
+                    assertThat(html).contains("/affix");
                 });
     }
 
@@ -937,6 +938,50 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void affixApiReportsCheaperTail() {
+        String a = "T".repeat(62) + "AAAAAAAA";
+        String b = "T".repeat(62) + "CCCCCCCC";
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/affix")
+                        .queryParam("text", a + b)
+                        .queryParam("wrap", "70")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.cheaperEnd").isEqualTo("tail")
+                .jsonPath("$.tailUniqueAt").isEqualTo(8)
+                .jsonPath("$.scanned").isEqualTo(2);
+    }
+
+    @Test
+    void affixPageRenders() {
+        webTestClient.get()
+                .uri("/affix")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Affix keys"));
+    }
+
+    @Test
+    void affixPageFormReportsCheaperTail() {
+        String a = "T".repeat(62) + "AAAAAAAA";
+        String b = "T".repeat(62) + "CCCCCCCC";
+        webTestClient.post()
+                .uri("/affix")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=" + a + b + "&wrap=70")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("cheaper=tail");
+                    assertThat(html).contains("tailUniqueAt=8");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -965,6 +1010,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.clones.cloneGroups").isNumber()
                 .jsonPath("$.prefixes.familyCount").isNumber()
                 .jsonPath("$.keys.uniqueAt").isNumber()
-                .jsonPath("$.forks.twinCount").isNumber();
+                .jsonPath("$.forks.twinCount").isNumber()
+                .jsonPath("$.affixes.cheaperEnd").exists();
     }
 }

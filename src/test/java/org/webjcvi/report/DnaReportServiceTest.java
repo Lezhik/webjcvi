@@ -43,12 +43,12 @@ class DnaReportServiceTest {
         assertThat(report.sequence().normalized()).isEqualTo("ATGCATGN");
         assertThat(report.markdown()).contains("WebJCVI DNA Report");
         assertThat(report.markdown()).contains("src/main/java/org/webjcvi/Example.java");
-        assertThat(report.markdown()).contains("Trailing keys");
+        assertThat(report.markdown()).contains("Interior keys");
         assertThat(report.markdown()).contains("Frame remainder");
         assertThat(report.sections()).containsKeys(
                 "length", "gcPercent", "javaSourceCount",
-                "wrapModalWidth", "tailUniqueAt", "tailShareAt8", "tailShareAt16",
-                "tailShareAt20", "leadUniqueAt");
+                "wrapModalWidth", "midUniqueAt", "midShareAt8", "midShareAt16",
+                "midShareAt20", "midStartAt16", "tailUniqueAt", "leadUniqueAt");
         assertThat(report.sequence().ambiguousTotal()).isEqualTo(1);
     }
 

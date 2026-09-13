@@ -26,6 +26,7 @@ import org.webjcvi.clone.CloneScan;
 import org.webjcvi.prefix.PrefixGroup;
 import org.webjcvi.key.KeyWidth;
 import org.webjcvi.fork.ForkScan;
+import org.webjcvi.affix.AffixScan;
 import org.webjcvi.logs.LogAnalysisReport;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.report.DnaReport;
@@ -66,6 +67,7 @@ public class WorkspaceApiController {
     private final PrefixGroup prefixes;
     private final KeyWidth keys;
     private final ForkScan forks;
+    private final AffixScan affixes;
     private final LogAnalysisService logAnalysis;
 
     public WorkspaceApiController(
@@ -90,6 +92,7 @@ public class WorkspaceApiController {
             PrefixGroup prefixes,
             KeyWidth keys,
             ForkScan forks,
+            AffixScan affixes,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -112,6 +115,7 @@ public class WorkspaceApiController {
         this.prefixes = prefixes;
         this.keys = keys;
         this.forks = forks;
+        this.affixes = affixes;
         this.logAnalysis = logAnalysis;
     }
 
@@ -689,6 +693,27 @@ public class WorkspaceApiController {
                                 return rec;
                             })
                             .toList());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/affix")
+    public Mono<Map<String, Object>> compareAffixes(
+            @RequestParam("text") String text,
+            @RequestParam(name = "wrap", defaultValue = "70") int wrapWidth) {
+        return Mono.fromCallable(() -> {
+                    var scan = affixes.measure(text, wrapWidth);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("wrapWidth", scan.wrapWidth());
+                    body.put("scanned", scan.scanned());
+                    body.put("leadUniqueAt", scan.leadUniqueAt());
+                    body.put("tailUniqueAt", scan.tailUniqueAt());
+                    body.put("cheaperEnd", scan.cheaperEnd());
+                    body.put("leadShareAtFloor", scan.leadShareAtFloor());
+                    body.put("tailShareAtFloor", scan.tailShareAtFloor());
+                    body.put("leadShareAtNear", scan.leadShareAtNear());
+                    body.put("tailShareAtNear", scan.tailShareAtNear());
                     return body;
                 })
                 .subscribeOn(Schedulers.boundedElastic());
