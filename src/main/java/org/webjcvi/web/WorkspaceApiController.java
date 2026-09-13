@@ -28,6 +28,7 @@ import org.webjcvi.key.KeyWidth;
 import org.webjcvi.fork.ForkScan;
 import org.webjcvi.affix.AffixScan;
 import org.webjcvi.lane.LaneScan;
+import org.webjcvi.row.RowScan;
 import org.webjcvi.logs.LogAnalysisReport;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.report.DnaReport;
@@ -70,6 +71,7 @@ public class WorkspaceApiController {
     private final ForkScan forks;
     private final AffixScan affixes;
     private final LaneScan lanes;
+    private final RowScan rows;
     private final LogAnalysisService logAnalysis;
 
     public WorkspaceApiController(
@@ -96,6 +98,7 @@ public class WorkspaceApiController {
             ForkScan forks,
             AffixScan affixes,
             LaneScan lanes,
+            RowScan rows,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -120,6 +123,7 @@ public class WorkspaceApiController {
         this.forks = forks;
         this.affixes = affixes;
         this.lanes = lanes;
+        this.rows = rows;
         this.logAnalysis = logAnalysis;
     }
 
@@ -747,6 +751,26 @@ public class WorkspaceApiController {
                                 return rec;
                             })
                             .toList());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/rows")
+    public Mono<Map<String, Object>> profileRows(
+            @RequestParam("text") String text) {
+        return Mono.fromCallable(() -> {
+                    var scan = rows.profile(text);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("lineCount", scan.lineCount());
+                    body.put("scanned", scan.scanned());
+                    body.put("tileLength", scan.tileLength());
+                    body.put("uniqueAt", scan.uniqueAt());
+                    body.put("uniqueShareAt16", scan.uniqueShareAt16());
+                    body.put("twinCount", scan.twinCount());
+                    body.put("twinLines", scan.twinLines());
+                    body.put("topPrefix", scan.topPrefix());
+                    body.put("topCount", scan.topCount());
                     return body;
                 })
                 .subscribeOn(Schedulers.boundedElastic());

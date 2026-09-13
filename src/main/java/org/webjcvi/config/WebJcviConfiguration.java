@@ -29,6 +29,7 @@ import org.webjcvi.key.KeyWidth;
 import org.webjcvi.fork.ForkScan;
 import org.webjcvi.affix.AffixScan;
 import org.webjcvi.lane.LaneScan;
+import org.webjcvi.row.RowScan;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -152,6 +153,11 @@ public class WebJcviConfiguration {
     @Bean
     LaneScan laneScan() {
         return new LaneScan();
+    }
+
+    @Bean
+    RowScan rowScan() {
+        return new RowScan();
     }
 
     @Bean
