@@ -25,6 +25,7 @@ import org.webjcvi.frame.FrameFields;
 import org.webjcvi.clone.CloneScan;
 import org.webjcvi.prefix.PrefixGroup;
 import org.webjcvi.key.KeyWidth;
+import org.webjcvi.fork.ForkScan;
 import org.webjcvi.logs.LogAnalysisReport;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.report.DnaReport;
@@ -64,6 +65,7 @@ public class WorkspaceApiController {
     private final CloneScan clones;
     private final PrefixGroup prefixes;
     private final KeyWidth keys;
+    private final ForkScan forks;
     private final LogAnalysisService logAnalysis;
 
     public WorkspaceApiController(
@@ -87,6 +89,7 @@ public class WorkspaceApiController {
             CloneScan clones,
             PrefixGroup prefixes,
             KeyWidth keys,
+            ForkScan forks,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -108,6 +111,7 @@ public class WorkspaceApiController {
         this.clones = clones;
         this.prefixes = prefixes;
         this.keys = keys;
+        this.forks = forks;
         this.logAnalysis = logAnalysis;
     }
 
@@ -651,6 +655,37 @@ public class WorkspaceApiController {
                                 rec.put("distinct", hit.distinct());
                                 rec.put("familyCount", hit.familyCount());
                                 rec.put("uniqueShare", hit.uniqueShare());
+                                return rec;
+                            })
+                            .toList());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/forks")
+    public Mono<Map<String, Object>> findForks(
+            @RequestParam("text") String text,
+            @RequestParam(name = "wrap", defaultValue = "70") int wrapWidth,
+            @RequestParam(name = "prefix", defaultValue = "16") int prefixLength) {
+        return Mono.fromCallable(() -> {
+                    var scan = forks.scan(text, wrapWidth, prefixLength);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("wrapWidth", scan.wrapWidth());
+                    body.put("prefixLength", scan.prefixLength());
+                    body.put("scanned", scan.scanned());
+                    body.put("distinct", scan.distinct());
+                    body.put("twinCount", scan.twinCount());
+                    body.put("twinFrames", scan.twinFrames());
+                    body.put("uniqueShare", scan.uniqueShare());
+                    body.put("topFork", scan.topFork());
+                    body.put("hits", scan.hits().stream()
+                            .map(hit -> {
+                                Map<String, Object> rec = new LinkedHashMap<>();
+                                rec.put("firstOffset", hit.firstOffset());
+                                rec.put("count", hit.count());
+                                rec.put("forkAt", hit.forkAt());
+                                rec.put("prefix", hit.prefix());
                                 return rec;
                             })
                             .toList());

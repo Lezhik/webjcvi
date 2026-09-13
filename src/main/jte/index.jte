@@ -51,6 +51,7 @@
         <p><a href="/clones">Clone frames</a> (find duplicate 70-wide wrap records).</p>
         <p><a href="/prefix">Prefix families</a> (group records by a shared leading 8-mer).</p>
         <p><a href="/keys">Key width</a> (smallest prefix that uniquely identifies every wrap-frame).</p>
+        <p><a href="/forks">Near-unique forks</a> (residual twins at a 16-character fingerprint, and where they diverge).</p>
         <form method="post" action="/report/regenerate">
             <button type="submit">Regenerate report</button>
         </form>

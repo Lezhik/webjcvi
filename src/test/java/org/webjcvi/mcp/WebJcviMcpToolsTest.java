@@ -56,6 +56,7 @@ class WebJcviMcpToolsTest {
                         "find_clones",
                         "group_prefixes",
                         "measure_key_width",
+                        "find_forks",
                         "analyze_logs",
                         "list_files",
                         "read_file");
@@ -105,7 +106,7 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Key width");
+        assertThat(markdown).contains("Trailing keys");
         assertThat(markdown).contains("Frame remainder");
     }
 
@@ -297,6 +298,18 @@ class WebJcviMcpToolsTest {
         assertThat(result).contains("k 9");
         assertThat(result).doesNotContain("hidden");
         assertThat(tools.readFile("secret.txt")).isEqualTo("HEADHEAD-hidden");
+    }
+
+    @Test
+    void findForksDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "ABCDEFGHIJKLMNOP-hidden");
+        String a = "ABCDEFGHIJKLMNOP" + "A".repeat(54);
+        String b = "ABCDEFGHIJKLMNOP" + "B".repeat(54);
+        String result = tools.findForks(a + b, 70, 16);
+        assertThat(result).contains("twinCount=1");
+        assertThat(result).contains("forkAt 17");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("ABCDEFGHIJKLMNOP-hidden");
     }
 
     @Test

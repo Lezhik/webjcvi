@@ -23,6 +23,7 @@ import org.webjcvi.frame.FrameFields;
 import org.webjcvi.clone.CloneScan;
 import org.webjcvi.prefix.PrefixGroup;
 import org.webjcvi.key.KeyWidth;
+import org.webjcvi.fork.ForkScan;
 
 /**
  * Fixed-API facade over the text-processing algorithms for log analysis.
@@ -57,12 +58,13 @@ public final class LogAnalysisService {
     private final CloneScan clones;
     private final PrefixGroup prefixes;
     private final KeyWidth keys;
+    private final ForkScan forks;
 
     public LogAnalysisService() {
         this(new BannerSplitter(), new PairDrift(), new WrapReflow(), new RareClassScanner(),
                 new RareBreakTokenizer(), new KmerStamp(), new PalindromeScan(), new StemLoop(),
                 new FuzzyFind(), new BlockContrast(), new MirrorJoint(), new SeamGuard(),
-                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth());
+                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan());
     }
 
     public LogAnalysisService(
@@ -82,7 +84,8 @@ public final class LogAnalysisService {
             FrameFields fields,
             CloneScan clones,
             PrefixGroup prefixes,
-            KeyWidth keys) {
+            KeyWidth keys,
+            ForkScan forks) {
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
@@ -100,6 +103,7 @@ public final class LogAnalysisService {
         this.clones = clones;
         this.prefixes = prefixes;
         this.keys = keys;
+        this.forks = forks;
     }
 
     /**
@@ -255,6 +259,16 @@ public final class LogAnalysisService {
                 keyScan.uniqueShareAtFloor(),
                 keyScan.uniqueShareAtWrap());
 
+        var forkScan = forks.scan(payload);
+        var forkSection = new LogAnalysisReport.ForkSection(
+                forkScan.scanned(),
+                forkScan.wrapWidth(),
+                forkScan.prefixLength(),
+                forkScan.twinCount(),
+                forkScan.twinFrames(),
+                forkScan.uniqueShare(),
+                forkScan.topFork());
+
         LogAnalysisReport report = new LogAnalysisReport(
                 API_VERSION,
                 inputLength,
@@ -276,9 +290,10 @@ public final class LogAnalysisService {
                 fieldSection,
                 cloneSection,
                 prefixSection,
-                keySection);
+                keySection,
+                forkSection);
         if (log.isDebugEnabled()) {
-            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={}",
+            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={}",
                     truncated,
                     tapeSection.runCount(),
                     bannerSection.sectionCount(),
@@ -295,7 +310,8 @@ public final class LogAnalysisService {
                     fieldSection.recordCount(),
                     cloneSection.cloneGroups(),
                     prefixSection.familyCount(),
-                    keySection.uniqueAt());
+                    keySection.uniqueAt(),
+                    forkSection.twinCount());
         }
         return report;
     }

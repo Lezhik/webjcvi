@@ -133,6 +133,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/clones");
                     assertThat(html).contains("/prefix");
                     assertThat(html).contains("/keys");
+                    assertThat(html).contains("/forks");
                 });
     }
 
@@ -891,6 +892,51 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void forkApiReportsTwinAtSeventeen() {
+        String a = "ABCDEFGHIJKLMNOP" + "A".repeat(54);
+        String b = "ABCDEFGHIJKLMNOP" + "B".repeat(54);
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/forks")
+                        .queryParam("text", a + b)
+                        .queryParam("wrap", "70")
+                        .queryParam("prefix", "16")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.twinCount").isEqualTo(1)
+                .jsonPath("$.topFork").isEqualTo(17)
+                .jsonPath("$.prefixLength").isEqualTo(16);
+    }
+
+    @Test
+    void forkPageRenders() {
+        webTestClient.get()
+                .uri("/forks")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Near-unique forks"));
+    }
+
+    @Test
+    void forkPageFormReportsTwinAtSeventeen() {
+        String a = "ABCDEFGHIJKLMNOP" + "A".repeat(54);
+        String b = "ABCDEFGHIJKLMNOP" + "B".repeat(54);
+        webTestClient.post()
+                .uri("/forks")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=" + a + b + "&wrap=70&prefix=16")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("twinCount=1");
+                    assertThat(html).contains("forkAt 17");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -918,6 +964,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.fields.recordCount").isNumber()
                 .jsonPath("$.clones.cloneGroups").isNumber()
                 .jsonPath("$.prefixes.familyCount").isNumber()
-                .jsonPath("$.keys.uniqueAt").isNumber();
+                .jsonPath("$.keys.uniqueAt").isNumber()
+                .jsonPath("$.forks.twinCount").isNumber();
     }
 }
