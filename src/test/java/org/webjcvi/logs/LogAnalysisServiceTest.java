@@ -41,7 +41,11 @@ class LogAnalysisServiceTest {
             "lanes",
             "rows",
             "cliffs",
-            "runways");
+            "runways",
+            "rises");
+    private static final List<String> RISE_KEYS = List.of(
+            "lineCount", "scanned", "floorLength", "riseAt", "gain",
+            "shareAtRise", "shareAt16", "cliffAt", "pastClock", "topPrefix", "topCount");
 
     private static final List<String> TAPE_KEYS = List.of("length", "runCount", "longestRun");
     private static final List<String> BANNER_KEYS = List.of("sectionCount", "minRun");
@@ -135,6 +139,7 @@ class LogAnalysisServiceTest {
         assertThat(root.get("rows").fieldNames()).toIterable().containsExactlyElementsOf(ROW_KEYS);
         assertThat(root.get("cliffs").fieldNames()).toIterable().containsExactlyElementsOf(CLIFF_KEYS);
         assertThat(root.get("runways").fieldNames()).toIterable().containsExactlyElementsOf(RUNWAY_KEYS);
+        assertThat(root.get("rises").fieldNames()).toIterable().containsExactlyElementsOf(RISE_KEYS);
         assertThat(root.get("tape").get("length").intValue()).isEqualTo(sample.length());
         assertThat(root.get("banners").get("sectionCount").intValue()).isGreaterThanOrEqualTo(1);
         assertThat(root.get("spans").get("spanCount").intValue()).isGreaterThanOrEqualTo(1);

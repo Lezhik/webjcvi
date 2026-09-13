@@ -57,6 +57,7 @@
         <p><a href="/rows">Line records</a> (uniqueness of newline-delimited lines, without dropping newlines).</p>
         <p><a href="/cliff">Clock cliff</a> (where colliding line prefixes first fork, past a timestamp).</p>
         <p><a href="/runway">Layout runway</a> (gap from first fork to uniqueness cliff — strip layout, start the id at cliffAt).</p>
+        <p><a href="/rise">Uniqueness rise</a> (steepest unique-share jump, even when uniqueness never reaches 0.99).</p>
         <form method="post" action="/report/regenerate">
             <button type="submit">Regenerate report</button>
         </form>

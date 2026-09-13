@@ -139,6 +139,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/rows");
                     assertThat(html).contains("/cliff");
                     assertThat(html).contains("/runway");
+                    assertThat(html).contains("/rise");
                 });
     }
 
@@ -1150,6 +1151,45 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void riseApiReportsFloorRiseOnDistinctLines() {
+        String text = "AAAAAAAA11111111 one\nCCCCCCCC22222222 two\n";
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/rise")
+                        .queryParam("text", text)
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.riseAt").isEqualTo(8)
+                .jsonPath("$.pastClock").isEqualTo(false);
+    }
+
+    @Test
+    void risePageRenders() {
+        webTestClient.get()
+                .uri("/rise")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Uniqueness rise"));
+    }
+
+    @Test
+    void risePageFormReportsFloorRise() {
+        webTestClient.post()
+                .uri("/rise")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=AAAAAAAA11111111+one%0ACCCCCCCC22222222+two")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("riseAt=8");
+                    assertThat(html).contains("pastClock=false");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -1183,6 +1223,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.lanes.spread").isNumber()
                 .jsonPath("$.rows.uniqueShareAt16").isNumber()
                 .jsonPath("$.cliffs.forkAt").isNumber()
-                .jsonPath("$.runways.runway").isNumber();
+                .jsonPath("$.runways.runway").isNumber()
+                .jsonPath("$.rises.riseAt").isNumber();
     }
 }
