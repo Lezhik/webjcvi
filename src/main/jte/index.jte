@@ -53,6 +53,7 @@
         <p><a href="/keys">Key width</a> (smallest prefix that uniquely identifies every wrap-frame).</p>
         <p><a href="/forks">Near-unique forks</a> (residual twins at a 16-character fingerprint, and where they diverge).</p>
         <p><a href="/affix">Affix keys</a> (which end of a wrap-frame saturates uniqueness first).</p>
+        <p><a href="/lanes">Uniqueness lanes</a> (which wrap-frame column is the cheapest 16-character fingerprint).</p>
         <form method="post" action="/report/regenerate">
             <button type="submit">Regenerate report</button>
         </form>

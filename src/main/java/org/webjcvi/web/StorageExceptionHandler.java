@@ -29,6 +29,7 @@ import org.webjcvi.prefix.PrefixException;
 import org.webjcvi.key.KeyException;
 import org.webjcvi.fork.ForkException;
 import org.webjcvi.affix.AffixException;
+import org.webjcvi.lane.LaneException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
@@ -151,6 +152,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> affix(AffixException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "affix", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(LaneException.class)
+    ResponseEntity<Map<String, String>> lane(LaneException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "lane", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

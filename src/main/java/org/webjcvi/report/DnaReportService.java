@@ -35,6 +35,7 @@ import org.webjcvi.dna.PrefixCensus;
 import org.webjcvi.dna.KeyWidthCensus;
 import org.webjcvi.dna.SuffixCensus;
 import org.webjcvi.dna.InteriorCensus;
+import org.webjcvi.dna.LandscapeCensus;
 import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.storage.StorageNotFoundException;
 import org.slf4j.Logger;
@@ -131,10 +132,11 @@ public final class DnaReportService {
         KeyWidthCensus keyWidth = KeyWidthCensus.from(sequence, wraps.modalWidth());
         SuffixCensus suffixCensus = SuffixCensus.from(sequence, wraps.modalWidth());
         InteriorCensus interior = InteriorCensus.from(sequence, wraps.modalWidth());
+        LandscapeCensus landscape = LandscapeCensus.from(sequence, wraps.modalWidth());
         Map<String, String> sections = buildSections(
-                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior);
+                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape);
         String markdown = renderMarkdown(
-                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior);
+                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape);
         storage.writeText(reportRelativePath(), markdown);
         if (log.isDebugEnabled()) {
             log.debug("dna-report.regenerate.done bases={} markdownChars={} path={}",
@@ -202,7 +204,8 @@ public final class DnaReportService {
             PrefixCensus prefixCensus,
             KeyWidthCensus keyWidth,
             SuffixCensus suffixCensus,
-            InteriorCensus interior) {
+            InteriorCensus interior,
+            LandscapeCensus landscape) {
         Map<String, String> sections = new LinkedHashMap<>();
         sections.put("meta", "generatedAt=" + ISO.format(generatedAt));
         sections.put("length", Integer.toString(sequence.length()));
@@ -211,11 +214,13 @@ public final class DnaReportService {
         sections.put("invalidTotal", Long.toString(sequence.invalidTotal()));
         sections.put("javaSourceCount", Integer.toString(javaSources.size()));
         sections.put("wrapModalWidth", Integer.toString(wraps.modalWidth()));
+        sections.put("landscapeTile", Integer.toString(landscape.tileLength()));
+        sections.put("landscapeTroughAt", Integer.toString(landscape.troughAt()));
+        sections.put("landscapePeakAt", Integer.toString(landscape.peakAt()));
+        sections.put("landscapeTroughShare", String.format(Locale.ROOT, "%.4f", landscape.troughShare()));
+        sections.put("landscapePeakShare", String.format(Locale.ROOT, "%.4f", landscape.peakShare()));
+        sections.put("landscapeSpread", String.format(Locale.ROOT, "%.4f", landscape.spread()));
         sections.put("midUniqueAt", Integer.toString(interior.uniqueAt()));
-        sections.put("midShareAt8", String.format(Locale.ROOT, "%.4f", interior.shareAt(8)));
-        sections.put("midShareAt16", String.format(Locale.ROOT, "%.4f", interior.shareAt(16)));
-        sections.put("midShareAt20", String.format(Locale.ROOT, "%.4f", interior.shareAt(20)));
-        sections.put("midStartAt16", Integer.toString(interior.midStartAt16()));
         sections.put("tailUniqueAt", Integer.toString(suffixCensus.uniqueAt()));
         sections.put("leadUniqueAt", Integer.toString(keyWidth.uniqueAt()));
         sections.put("longestHomopolymer", runs.longestBase() + "x" + runs.longestLength());
@@ -248,15 +253,17 @@ public final class DnaReportService {
             PrefixCensus prefixCensus,
             KeyWidthCensus keyWidth,
             SuffixCensus suffixCensus,
-            InteriorCensus interior) {
+            InteriorCensus interior,
+            LandscapeCensus landscape) {
         StringBuilder md = new StringBuilder();
         md.append("# WebJCVI DNA Report\n\n");
         md.append("Generated at **").append(ISO.format(generatedAt.atOffset(ZoneOffset.UTC))).append("**.\n\n");
         md.append("This report is rebuilt from `").append(dnaRelativePath)
-                .append("` and a snapshot of the current codebase. Version 21 of the builder ")
-                .append("walks unique share of wrap-frame <em>centered</em> tiles. v20 showed ")
-                .append("tail uniqueAt=17 vs lead uniqueAt=20 with matching k=8/16 shares; ")
-                .append("this asks whether uniqueness is edges-only or the same entropy in the interior.\n\n");
+                .append("` and a snapshot of the current codebase. Version 22 of the builder ")
+                .append("walks unique share of a k=16 wrap-frame tile at <em>every</em> start column. ")
+                .append("v21 showed mid uniqueAt=17 with k=16 share 0.9999 (same as the tail); ")
+                .append("five sampled lanes then measured a log-journal spread of ~0.012. ")
+                .append("This asks whether a hidden peak sits between those samples, or k=16 uniqueness is a plateau.\n\n");
 
         md.append("## Sequence composition\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
@@ -297,28 +304,45 @@ public final class DnaReportService {
         md.append("First ").append(PREVIEW_BASES).append(" normalized bases:\n\n```\n");
         md.append(sequence.preview(PREVIEW_BASES)).append("\n```\n\n");
 
-        md.append("## Interior keys\n\n");
-        md.append("Non-overlapping wrap frames of width **").append(interior.wrapWidth())
-                .append("**. Unique share of a <em>centered</em> tile of length k, from floor **")
-                .append(interior.floorLength())
-                .append("**. The k=16 window starts at column **").append(interior.midStartAt16())
-                .append("**. **uniqueAt** is the smallest centered k whose unique share is 1.0. ")
-                .append("If mid uniqueAt ≈ tail uniqueAt (17) and lead uniqueAt (20), uniqueness is entropy; ")
-                .append("if the middle collides farther, the key lives at the edges.\n\n");
+        md.append("## Uniqueness landscape\n\n");
+        md.append("Non-overlapping wrap frames of width **").append(landscape.wrapWidth())
+                .append("**. Unique share of a tile of length **").append(landscape.tileLength())
+                .append("** at every start column `0 .. wrap-tile`. ")
+                .append("**troughAt** / **peakAt** are the first columns of minimum / maximum unique share. ")
+                .append("**spread** is peakShare − troughShare. If spread is near 0, uniqueness is a plateau; ")
+                .append("if a column far from 0/27/54 spikes, the five-lane sample hid a fingerprint.\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
-        md.append("| Frames | ").append(interior.frames()).append(" |\n");
-        md.append("| Mid unique at (k) | ").append(interior.uniqueAt()).append(" |\n");
-        md.append("| Mid-16 start column | ").append(interior.midStartAt16()).append(" |\n");
-        for (InteriorCensus.Row row : interior.samples()) {
-            md.append("| Mid unique share k=").append(row.length()).append(" | ")
-                    .append(String.format(Locale.ROOT, "%.4f", row.uniqueShare()))
-                    .append(" (").append(row.distinct()).append(" distinct) |\n");
+        md.append("| Frames | ").append(landscape.frames()).append(" |\n");
+        md.append("| Tile length | ").append(landscape.tileLength()).append(" |\n");
+        md.append("| Trough column | ").append(landscape.troughAt()).append(" |\n");
+        md.append("| Peak column | ").append(landscape.peakAt()).append(" |\n");
+        md.append("| Trough unique share | ")
+                .append(String.format(Locale.ROOT, "%.4f", landscape.troughShare())).append(" |\n");
+        md.append("| Peak unique share | ")
+                .append(String.format(Locale.ROOT, "%.4f", landscape.peakShare())).append(" |\n");
+        md.append("| Spread | ")
+                .append(String.format(Locale.ROOT, "%.4f", landscape.spread())).append(" |\n");
+        md.append("| Columns scanned | ").append(landscape.columns().size()).append(" |\n\n");
+        md.append("`").append(landscape.toTextRow()).append("`\n\n");
+        md.append("| Start | Distinct | Unique share |\n| --- | --- | --- |\n");
+        for (LandscapeCensus.Column column : landscape.columns()) {
+            md.append("| ").append(column.start()).append(" | ")
+                    .append(column.distinct()).append(" | ")
+                    .append(String.format(Locale.ROOT, "%.4f", column.uniqueShare()))
+                    .append(" |\n");
         }
         md.append('\n');
-        md.append("`").append(interior.toTextRow()).append("`\n\n");
 
         md.append("## Frame remainder\n\n");
-        md.append("Trailing-key remainder: uniqueAt **").append(suffixCensus.uniqueAt())
+        md.append("Interior-key remainder: uniqueAt **").append(interior.uniqueAt())
+                .append("**, k=16 start column **").append(interior.midStartAt16())
+                .append("**, unique share k=8 **")
+                .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(8)))
+                .append("**, k=16 **")
+                .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(16)))
+                .append("**, k=20 **")
+                .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(20)))
+                .append("**. Trailing-key remainder: uniqueAt **").append(suffixCensus.uniqueAt())
                 .append("**, unique share k=8 **")
                 .append(String.format(Locale.ROOT, "%.4f", suffixCensus.shareAt(8)))
                 .append("**, k=16 **")
@@ -400,7 +424,7 @@ public final class DnaReportService {
                 .append("**.\n\n");
 
         md.append("## Extracted tape rules\n\n");
-        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior);
+        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape);
 
         md.append("## Codebase snapshot\n\n");
         md.append(javaSources.size()).append(" Java source files under `src/main/java`:\n\n");
@@ -415,24 +439,26 @@ public final class DnaReportService {
 
         md.append("## Growth notes for the next iteration\n\n");
         md.append("- Dominant canonical base: **").append(dominantBase(sequence)).append("**.\n");
-        md.append("- Interior keys: uniqueAt **").append(interior.uniqueAt())
-                .append("** of wrap **").append(interior.wrapWidth())
-                .append("** (k=16 starts at column **").append(interior.midStartAt16())
-                .append("**); unique share k=8 **")
-                .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(8)))
-                .append("**, k=16 **")
-                .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(16)))
-                .append("**, k=20 **")
-                .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(20)))
-                .append("**. Tail uniqueAt remainder **").append(suffixCensus.uniqueAt())
+        md.append("- Uniqueness landscape: tile **").append(landscape.tileLength())
+                .append("** of wrap **").append(landscape.wrapWidth())
+                .append("**; troughAt **").append(landscape.troughAt())
+                .append("** (share **")
+                .append(String.format(Locale.ROOT, "%.4f", landscape.troughShare()))
+                .append("**); peakAt **").append(landscape.peakAt())
+                .append("** (share **")
+                .append(String.format(Locale.ROOT, "%.4f", landscape.peakShare()))
+                .append("**); spread **")
+                .append(String.format(Locale.ROOT, "%.4f", landscape.spread()))
+                .append("**. Interior uniqueAt remainder **").append(interior.uniqueAt())
+                .append("**; tail uniqueAt remainder **").append(suffixCensus.uniqueAt())
                 .append("**; lead uniqueAt remainder **").append(keyWidth.uniqueAt())
-                .append("**. If mid ≈ tail ≈ lead, uniqueness is entropy; if mid is larger, the key is at the edges.\n");
+                .append("**. If spread is large away from 0/27/54, a fingerprint column was hidden; if spread is near 0, k=16 uniqueness is a plateau.\n");
         md.append("- Reverse-only remainder: wrap/mean **")
                 .append(String.format(Locale.ROOT, "%.3f", phases.wrapVsMean()))
                 .append("**.\n");
         md.append("- Homopolymer longest **").append(runs.longestBase()).append(" × ")
                 .append(runs.longestLength()).append("**.\n");
-        md.append("- Module split (TZ §6.14) is **not** indicated: single Gradle module, no sub-module reports.\n");
+        md.append("- Module split (TZ §6.15) is **not** indicated: single Gradle module, no sub-module reports.\n");
 
         md.append("\n## Machine-readable sections\n\n");
         md.append("```\n");
@@ -465,25 +491,30 @@ public final class DnaReportService {
             PrefixCensus prefixCensus,
             KeyWidthCensus keyWidth,
             SuffixCensus suffixCensus,
-            InteriorCensus interior) {
+            InteriorCensus interior,
+            LandscapeCensus landscape) {
         long a = sequence.canonicalCounts().getOrDefault('A', 0L);
         long t = sequence.canonicalCounts().getOrDefault('T', 0L);
-        md.append("1. **R1 Interior keys.** Frames ").append(interior.frames())
-                .append(" mid uniqueAt ").append(interior.uniqueAt())
-                .append(" wrap ").append(interior.wrapWidth())
+        md.append("1. **R1 Uniqueness landscape.** Frames ").append(landscape.frames())
+                .append(" wrap ").append(landscape.wrapWidth())
+                .append(" tile ").append(landscape.tileLength())
+                .append(" troughAt ").append(landscape.troughAt())
+                .append(" peakAt ").append(landscape.peakAt())
+                .append(" trough ")
+                .append(String.format(Locale.ROOT, "%.4f", landscape.troughShare()))
+                .append(" peak ")
+                .append(String.format(Locale.ROOT, "%.4f", landscape.peakShare()))
+                .append(" spread ")
+                .append(String.format(Locale.ROOT, "%.4f", landscape.spread()))
+                .append(" columns ").append(landscape.columns().size())
+                .append(".\n");
+        md.append("2. **R2 Interior/trailing/leading remainder.** Mid uniqueAt ").append(interior.uniqueAt())
                 .append(" midStart16 ").append(interior.midStartAt16())
-                .append("; mid unique share k=8 ")
+                .append(" share k=8 ")
                 .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(8)))
                 .append(" k=16 ")
                 .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(16)))
-                .append(" k=20 ")
-                .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(20)))
-                .append(" k=24 ")
-                .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(24)))
-                .append(" k=70 ")
-                .append(String.format(Locale.ROOT, "%.4f", interior.shareAt(70)))
-                .append(".\n");
-        md.append("2. **R2 Trailing/leading remainder.** Tail uniqueAt ").append(suffixCensus.uniqueAt())
+                .append("; tail uniqueAt ").append(suffixCensus.uniqueAt())
                 .append(" share k=8 ")
                 .append(String.format(Locale.ROOT, "%.4f", suffixCensus.shareAt(8)))
                 .append(" k=16 ")

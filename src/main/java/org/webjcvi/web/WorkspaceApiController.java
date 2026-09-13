@@ -27,6 +27,7 @@ import org.webjcvi.prefix.PrefixGroup;
 import org.webjcvi.key.KeyWidth;
 import org.webjcvi.fork.ForkScan;
 import org.webjcvi.affix.AffixScan;
+import org.webjcvi.lane.LaneScan;
 import org.webjcvi.logs.LogAnalysisReport;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.report.DnaReport;
@@ -68,6 +69,7 @@ public class WorkspaceApiController {
     private final KeyWidth keys;
     private final ForkScan forks;
     private final AffixScan affixes;
+    private final LaneScan lanes;
     private final LogAnalysisService logAnalysis;
 
     public WorkspaceApiController(
@@ -93,6 +95,7 @@ public class WorkspaceApiController {
             KeyWidth keys,
             ForkScan forks,
             AffixScan affixes,
+            LaneScan lanes,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -116,6 +119,7 @@ public class WorkspaceApiController {
         this.keys = keys;
         this.forks = forks;
         this.affixes = affixes;
+        this.lanes = lanes;
         this.logAnalysis = logAnalysis;
     }
 
@@ -714,6 +718,35 @@ public class WorkspaceApiController {
                     body.put("tailShareAtFloor", scan.tailShareAtFloor());
                     body.put("leadShareAtNear", scan.leadShareAtNear());
                     body.put("tailShareAtNear", scan.tailShareAtNear());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/lanes")
+    public Mono<Map<String, Object>> profileLanes(
+            @RequestParam("text") String text,
+            @RequestParam(name = "wrap", defaultValue = "70") int wrapWidth) {
+        return Mono.fromCallable(() -> {
+                    var scan = lanes.profile(text, wrapWidth);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("wrapWidth", scan.wrapWidth());
+                    body.put("tileLength", scan.tileLength());
+                    body.put("scanned", scan.scanned());
+                    body.put("troughAt", scan.troughAt());
+                    body.put("peakAt", scan.peakAt());
+                    body.put("troughShare", scan.troughShare());
+                    body.put("peakShare", scan.peakShare());
+                    body.put("spread", scan.spread());
+                    body.put("lanes", scan.lanes().stream()
+                            .map(hit -> {
+                                Map<String, Object> rec = new LinkedHashMap<>();
+                                rec.put("start", hit.start());
+                                rec.put("distinct", hit.distinct());
+                                rec.put("uniqueShare", hit.uniqueShare());
+                                return rec;
+                            })
+                            .toList());
                     return body;
                 })
                 .subscribeOn(Schedulers.boundedElastic());

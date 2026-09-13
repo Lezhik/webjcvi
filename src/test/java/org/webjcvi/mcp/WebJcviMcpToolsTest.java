@@ -58,6 +58,7 @@ class WebJcviMcpToolsTest {
                         "measure_key_width",
                         "find_forks",
                         "compare_affixes",
+                        "profile_lanes",
                         "analyze_logs",
                         "list_files",
                         "read_file");
@@ -107,7 +108,7 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Interior keys");
+        assertThat(markdown).contains("Uniqueness landscape");
         assertThat(markdown).contains("Frame remainder");
     }
 
@@ -321,6 +322,18 @@ class WebJcviMcpToolsTest {
         String result = tools.compareAffixes(a + b, 70);
         assertThat(result).contains("cheaper=tail");
         assertThat(result).contains("tailUniqueAt=8");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("AAAAAAAA-hidden");
+    }
+
+    @Test
+    void profileLanesDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "AAAAAAAA-hidden");
+        String a = "T".repeat(35) + "A".repeat(8) + "T".repeat(27);
+        String b = "T".repeat(35) + "C".repeat(8) + "T".repeat(27);
+        String result = tools.profileLanes(a + b, 70);
+        assertThat(result).contains("peakAt=27");
+        assertThat(result).contains("spread=0.5000");
         assertThat(result).doesNotContain("hidden");
         assertThat(tools.readFile("secret.txt")).isEqualTo("AAAAAAAA-hidden");
     }

@@ -135,6 +135,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/keys");
                     assertThat(html).contains("/forks");
                     assertThat(html).contains("/affix");
+                    assertThat(html).contains("/lanes");
                 });
     }
 
@@ -982,6 +983,50 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void laneApiReportsInteriorPeak() {
+        String a = "T".repeat(35) + "A".repeat(8) + "T".repeat(27);
+        String b = "T".repeat(35) + "C".repeat(8) + "T".repeat(27);
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/lanes")
+                        .queryParam("text", a + b)
+                        .queryParam("wrap", "70")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.peakAt").isEqualTo(27)
+                .jsonPath("$.troughAt").isEqualTo(0)
+                .jsonPath("$.spread").isEqualTo(0.5);
+    }
+
+    @Test
+    void lanePageRenders() {
+        webTestClient.get()
+                .uri("/lanes")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Uniqueness lanes"));
+    }
+
+    @Test
+    void lanePageFormReportsInteriorPeak() {
+        String a = "T".repeat(35) + "A".repeat(8) + "T".repeat(27);
+        String b = "T".repeat(35) + "C".repeat(8) + "T".repeat(27);
+        webTestClient.post()
+                .uri("/lanes")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=" + a + b + "&wrap=70")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("peakAt=27");
+                    assertThat(html).contains("spread=0.5000");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -1011,6 +1056,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.prefixes.familyCount").isNumber()
                 .jsonPath("$.keys.uniqueAt").isNumber()
                 .jsonPath("$.forks.twinCount").isNumber()
-                .jsonPath("$.affixes.cheaperEnd").exists();
+                .jsonPath("$.affixes.cheaperEnd").exists()
+                .jsonPath("$.lanes.spread").isNumber();
     }
 }

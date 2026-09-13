@@ -25,6 +25,7 @@ import org.webjcvi.prefix.PrefixGroup;
 import org.webjcvi.key.KeyWidth;
 import org.webjcvi.fork.ForkScan;
 import org.webjcvi.affix.AffixScan;
+import org.webjcvi.lane.LaneScan;
 
 /**
  * Fixed-API facade over the text-processing algorithms for log analysis.
@@ -61,12 +62,13 @@ public final class LogAnalysisService {
     private final KeyWidth keys;
     private final ForkScan forks;
     private final AffixScan affixes;
+    private final LaneScan lanes;
 
     public LogAnalysisService() {
         this(new BannerSplitter(), new PairDrift(), new WrapReflow(), new RareClassScanner(),
                 new RareBreakTokenizer(), new KmerStamp(), new PalindromeScan(), new StemLoop(),
                 new FuzzyFind(), new BlockContrast(), new MirrorJoint(), new SeamGuard(),
-                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan());
+                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan());
     }
 
     public LogAnalysisService(
@@ -88,7 +90,8 @@ public final class LogAnalysisService {
             PrefixGroup prefixes,
             KeyWidth keys,
             ForkScan forks,
-            AffixScan affixes) {
+            AffixScan affixes,
+            LaneScan lanes) {
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
@@ -108,6 +111,7 @@ public final class LogAnalysisService {
         this.keys = keys;
         this.forks = forks;
         this.affixes = affixes;
+        this.lanes = lanes;
     }
 
     /**
@@ -283,6 +287,17 @@ public final class LogAnalysisService {
                 affixScan.leadShareAtNear(),
                 affixScan.tailShareAtNear());
 
+        var laneScan = lanes.profile(payload);
+        var laneSection = new LogAnalysisReport.LaneSection(
+                laneScan.scanned(),
+                laneScan.wrapWidth(),
+                laneScan.tileLength(),
+                laneScan.troughAt(),
+                laneScan.peakAt(),
+                laneScan.troughShare(),
+                laneScan.peakShare(),
+                laneScan.spread());
+
         LogAnalysisReport report = new LogAnalysisReport(
                 API_VERSION,
                 inputLength,
@@ -306,9 +321,10 @@ public final class LogAnalysisService {
                 prefixSection,
                 keySection,
                 forkSection,
-                affixSection);
+                affixSection,
+                laneSection);
         if (log.isDebugEnabled()) {
-            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={} affixes={}",
+            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={} affixes={} lanes={}",
                     truncated,
                     tapeSection.runCount(),
                     bannerSection.sectionCount(),
@@ -327,7 +343,8 @@ public final class LogAnalysisService {
                     prefixSection.familyCount(),
                     keySection.uniqueAt(),
                     forkSection.twinCount(),
-                    affixSection.cheaperEnd());
+                    affixSection.cheaperEnd(),
+                    laneSection.spread());
         }
         return report;
     }

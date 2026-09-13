@@ -28,6 +28,7 @@ import org.webjcvi.prefix.PrefixGroup;
 import org.webjcvi.key.KeyWidth;
 import org.webjcvi.fork.ForkScan;
 import org.webjcvi.affix.AffixScan;
+import org.webjcvi.lane.LaneScan;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -146,6 +147,11 @@ public class WebJcviConfiguration {
     @Bean
     AffixScan affixScan() {
         return new AffixScan();
+    }
+
+    @Bean
+    LaneScan laneScan() {
+        return new LaneScan();
     }
 
     @Bean
