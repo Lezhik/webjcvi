@@ -31,7 +31,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
         "forks",
         "affixes",
         "lanes",
-        "rows"
+        "rows",
+        "cliffs"
 })
 public record LogAnalysisReport(
         int apiVersion,
@@ -58,7 +59,8 @@ public record LogAnalysisReport(
         ForkSection forks,
         AffixSection affixes,
         LaneSection lanes,
-        RowSection rows) {
+        RowSection rows,
+        CliffSection cliffs) {
 
     @JsonPropertyOrder({"length", "runCount", "longestRun"})
     public record TapeSection(int length, int runCount, int longestRun) {
@@ -220,6 +222,21 @@ public record LogAnalysisReport(
             double uniqueShareAt16,
             int twinCount,
             int twinLines,
+            String topPrefix,
+            int topCount) {
+    }
+
+    @JsonPropertyOrder({
+            "lineCount", "scanned", "tileLength", "forkAt", "cliffAt",
+            "shareAt16", "shareAtCliff", "topPrefix", "topCount"})
+    public record CliffSection(
+            int lineCount,
+            int scanned,
+            int tileLength,
+            int forkAt,
+            int cliffAt,
+            double shareAt16,
+            double shareAtCliff,
             String topPrefix,
             int topCount) {
     }

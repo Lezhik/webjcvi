@@ -27,6 +27,7 @@ import org.webjcvi.fork.ForkScan;
 import org.webjcvi.affix.AffixScan;
 import org.webjcvi.lane.LaneScan;
 import org.webjcvi.row.RowScan;
+import org.webjcvi.cliff.CliffScan;
 
 /**
  * Fixed-API facade over the text-processing algorithms for log analysis.
@@ -65,12 +66,13 @@ public final class LogAnalysisService {
     private final AffixScan affixes;
     private final LaneScan lanes;
     private final RowScan rows;
+    private final CliffScan cliffs;
 
     public LogAnalysisService() {
         this(new BannerSplitter(), new PairDrift(), new WrapReflow(), new RareClassScanner(),
                 new RareBreakTokenizer(), new KmerStamp(), new PalindromeScan(), new StemLoop(),
                 new FuzzyFind(), new BlockContrast(), new MirrorJoint(), new SeamGuard(),
-                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan());
+                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan());
     }
 
     public LogAnalysisService(
@@ -94,7 +96,8 @@ public final class LogAnalysisService {
             ForkScan forks,
             AffixScan affixes,
             LaneScan lanes,
-            RowScan rows) {
+            RowScan rows,
+            CliffScan cliffs) {
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
@@ -116,6 +119,7 @@ public final class LogAnalysisService {
         this.affixes = affixes;
         this.lanes = lanes;
         this.rows = rows;
+        this.cliffs = cliffs;
     }
 
     /**
@@ -314,6 +318,18 @@ public final class LogAnalysisService {
                 rowScan.topPrefix(),
                 rowScan.topCount());
 
+        var cliffScan = cliffs.profile(payload);
+        var cliffSection = new LogAnalysisReport.CliffSection(
+                cliffScan.lineCount(),
+                cliffScan.scanned(),
+                cliffScan.tileLength(),
+                cliffScan.forkAt(),
+                cliffScan.cliffAt(),
+                cliffScan.shareAt16(),
+                cliffScan.shareAtCliff(),
+                cliffScan.topPrefix(),
+                cliffScan.topCount());
+
         LogAnalysisReport report = new LogAnalysisReport(
                 API_VERSION,
                 inputLength,
@@ -339,9 +355,10 @@ public final class LogAnalysisService {
                 forkSection,
                 affixSection,
                 laneSection,
-                rowSection);
+                rowSection,
+                cliffSection);
         if (log.isDebugEnabled()) {
-            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={} affixes={} lanes={} rows={}",
+            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={} affixes={} lanes={} rows={} cliffs={}",
                     truncated,
                     tapeSection.runCount(),
                     bannerSection.sectionCount(),
@@ -362,7 +379,8 @@ public final class LogAnalysisService {
                     forkSection.twinCount(),
                     affixSection.cheaperEnd(),
                     laneSection.spread(),
-                    rowSection.uniqueShareAt16());
+                    rowSection.uniqueShareAt16(),
+                    cliffSection.forkAt());
         }
         return report;
     }

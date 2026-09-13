@@ -31,6 +31,7 @@ import org.webjcvi.fork.ForkException;
 import org.webjcvi.affix.AffixException;
 import org.webjcvi.lane.LaneException;
 import org.webjcvi.row.RowException;
+import org.webjcvi.cliff.CliffException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
@@ -165,6 +166,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> row(RowException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "row", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(CliffException.class)
+    ResponseEntity<Map<String, String>> cliff(CliffException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "cliff", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

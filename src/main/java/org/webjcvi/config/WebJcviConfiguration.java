@@ -30,6 +30,7 @@ import org.webjcvi.fork.ForkScan;
 import org.webjcvi.affix.AffixScan;
 import org.webjcvi.lane.LaneScan;
 import org.webjcvi.row.RowScan;
+import org.webjcvi.cliff.CliffScan;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -158,6 +159,11 @@ public class WebJcviConfiguration {
     @Bean
     RowScan rowScan() {
         return new RowScan();
+    }
+
+    @Bean
+    CliffScan cliffScan() {
+        return new CliffScan();
     }
 
     @Bean

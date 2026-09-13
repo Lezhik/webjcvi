@@ -137,6 +137,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/affix");
                     assertThat(html).contains("/lanes");
                     assertThat(html).contains("/rows");
+                    assertThat(html).contains("/cliff");
                 });
     }
 
@@ -1068,6 +1069,46 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void cliffApiReportsForkPastSixteen() {
+        String text = "2026-09-13 21:56 worker-a\n2026-09-13 21:56 worker-b\n";
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/cliff")
+                        .queryParam("text", text)
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.forkAt").isEqualTo(25)
+                .jsonPath("$.cliffAt").isEqualTo(25)
+                .jsonPath("$.shareAt16").isEqualTo(0.5);
+    }
+
+    @Test
+    void cliffPageRenders() {
+        webTestClient.get()
+                .uri("/cliff")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Clock cliff"));
+    }
+
+    @Test
+    void cliffPageFormReportsForkPastSixteen() {
+        webTestClient.post()
+                .uri("/cliff")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=2026-09-13 21:56 worker-a%0A2026-09-13 21:56 worker-b")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("forkAt=25");
+                    assertThat(html).contains("cliffAt=25");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -1099,6 +1140,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.forks.twinCount").isNumber()
                 .jsonPath("$.affixes.cheaperEnd").exists()
                 .jsonPath("$.lanes.spread").isNumber()
-                .jsonPath("$.rows.uniqueShareAt16").isNumber();
+                .jsonPath("$.rows.uniqueShareAt16").isNumber()
+                .jsonPath("$.cliffs.forkAt").isNumber();
     }
 }

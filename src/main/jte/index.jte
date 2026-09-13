@@ -55,6 +55,7 @@
         <p><a href="/affix">Affix keys</a> (which end of a wrap-frame saturates uniqueness first).</p>
         <p><a href="/lanes">Uniqueness lanes</a> (which wrap-frame column is the cheapest 16-character fingerprint).</p>
         <p><a href="/rows">Line records</a> (uniqueness of newline-delimited lines, without dropping newlines).</p>
+        <p><a href="/cliff">Clock cliff</a> (where colliding line prefixes first fork, past a timestamp).</p>
         <form method="post" action="/report/regenerate">
             <button type="submit">Regenerate report</button>
         </form>
