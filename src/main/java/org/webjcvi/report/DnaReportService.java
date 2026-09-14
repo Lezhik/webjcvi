@@ -41,6 +41,7 @@ import org.webjcvi.dna.LineForkCensus;
 import org.webjcvi.dna.LineRunwayCensus;
 import org.webjcvi.dna.LineRiseCensus;
 import org.webjcvi.dna.LineMajorityCensus;
+import org.webjcvi.dna.LineNearCensus;
 import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.storage.StorageNotFoundException;
 import org.slf4j.Logger;
@@ -143,10 +144,11 @@ public final class DnaReportService {
         LineRunwayCensus lineRunways = LineRunwayCensus.fromRaw(raw);
         LineRiseCensus lineRises = LineRiseCensus.fromRaw(raw);
         LineMajorityCensus lineMajorities = LineMajorityCensus.fromRaw(raw);
+        LineNearCensus lineNears = LineNearCensus.fromRaw(raw);
         Map<String, String> sections = buildSections(
-                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks, lineRunways, lineRises, lineMajorities);
+                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks, lineRunways, lineRises, lineMajorities, lineNears);
         String markdown = renderMarkdown(
-                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks, lineRunways, lineRises, lineMajorities);
+                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks, lineRunways, lineRises, lineMajorities, lineNears);
         storage.writeText(reportRelativePath(), markdown);
         if (log.isDebugEnabled()) {
             log.debug("dna-report.regenerate.done bases={} markdownChars={} path={}",
@@ -220,7 +222,8 @@ public final class DnaReportService {
             LineForkCensus lineForks,
             LineRunwayCensus lineRunways,
             LineRiseCensus lineRises,
-            LineMajorityCensus lineMajorities) {
+            LineMajorityCensus lineMajorities,
+            LineNearCensus lineNears) {
         Map<String, String> sections = new LinkedHashMap<>();
         sections.put("meta", "generatedAt=" + ISO.format(generatedAt));
         sections.put("length", Integer.toString(sequence.length()));
@@ -229,8 +232,9 @@ public final class DnaReportService {
         sections.put("invalidTotal", Long.toString(sequence.invalidTotal()));
         sections.put("javaSourceCount", Integer.toString(javaSources.size()));
         sections.put("wrapModalWidth", Integer.toString(wraps.modalWidth()));
+        sections.put("lineNearAt", Integer.toString(lineNears.nearAt()));
+        sections.put("lineShareAtNear", String.format(Locale.ROOT, "%.4f", lineNears.shareAtNear()));
         sections.put("lineMajorityAt", Integer.toString(lineMajorities.majorityAt()));
-        sections.put("lineShareAtMajority", String.format(Locale.ROOT, "%.4f", lineMajorities.shareAtMajority()));
         sections.put("lineRiseAt", Integer.toString(lineRises.riseAt()));
         sections.put("lineCliffAt", Integer.toString(lineRises.cliffAt()));
         sections.put("lineOverhang", Integer.toString(lineRunways.overhang()));
@@ -271,16 +275,17 @@ public final class DnaReportService {
             LineForkCensus lineForks,
             LineRunwayCensus lineRunways,
             LineRiseCensus lineRises,
-            LineMajorityCensus lineMajorities) {
+            LineMajorityCensus lineMajorities,
+            LineNearCensus lineNears) {
         StringBuilder md = new StringBuilder();
         md.append("# WebJCVI DNA Report\n\n");
         md.append("Generated at **").append(ISO.format(generatedAt.atOffset(ZoneOffset.UTC))).append("**.\n\n");
         md.append("This report is rebuilt from `").append(dnaRelativePath)
-                .append("` and a snapshot of the current codebase. Version 27 of the builder ")
-                .append("walks the smallest k whose unique share is at least 0.5 on source lines. ")
-                .append("v26 uniqueness jumps at the floor (riseAt=8, gain 0.7191); ")
-                .append("log journals then had riseAt=23 with share only ~0.28. ")
-                .append("This asks where FASTA unique share covers a majority, not where it accelerates fastest.\n\n");
+                .append("` and a snapshot of the current codebase. Version 28 of the builder ")
+                .append("walks the smallest k whose unique share is at least 0.90 on source lines. ")
+                .append("v27 uniqueness covers a majority at the floor (share 0.7191) then 0.8726 at k=9; ")
+                .append("log journals then had majorityAt=61 with share only ~0.55 while 0.99 never arrived. ")
+                .append("This asks where FASTA unique share becomes near-unique, not where it first covers half.\n\n");
 
         md.append("## Sequence composition\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
@@ -321,25 +326,28 @@ public final class DnaReportService {
         md.append("First ").append(PREVIEW_BASES).append(" normalized bases:\n\n```\n");
         md.append(sequence.preview(PREVIEW_BASES)).append("\n```\n\n");
 
-        md.append("## Line majority\n\n");
-        md.append("Source lines kept. **majorityAt** is the smallest k≥8 whose unique share is ≥ 0.5. ")
-                .append("If majorityAt equals riseAt, the steepest jump already covers a majority ")
-                .append("(DNA-tight). If majorityAt sits past riseAt, residual collisions remain after the jump.\n\n");
+        md.append("## Line near\n\n");
+        md.append("Source lines kept. **nearAt** is the smallest k≥8 whose unique share is ≥ 0.90. ")
+                .append("If nearAt equals majorityAt, the floor jump is already near-unique. ")
+                .append("If nearAt sits past majorityAt, half-unique is not yet a key.\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
-        md.append("| Lines | ").append(lineMajorities.lines()).append(" |\n");
-        md.append("| Majority at (k) | ").append(lineMajorities.majorityAt()).append(" |\n");
-        md.append("| Share at majority | ").append(String.format(Locale.ROOT, "%.4f", lineMajorities.shareAtMajority())).append(" |\n");
-        md.append("| Rise at (k) | ").append(lineMajorities.riseAt()).append(" |\n");
-        md.append("| Share at rise | ").append(String.format(Locale.ROOT, "%.4f", lineMajorities.shareAtRise())).append(" |\n");
-        for (LineMajorityCensus.Row row : lineMajorities.samples()) {
+        md.append("| Lines | ").append(lineNears.lines()).append(" |\n");
+        md.append("| Near at (k) | ").append(lineNears.nearAt()).append(" |\n");
+        md.append("| Share at near | ").append(String.format(Locale.ROOT, "%.4f", lineNears.shareAtNear())).append(" |\n");
+        md.append("| Majority at (k) | ").append(lineNears.majorityAt()).append(" |\n");
+        md.append("| Share at majority | ").append(String.format(Locale.ROOT, "%.4f", lineNears.shareAtMajority())).append(" |\n");
+        for (LineNearCensus.Row row : lineNears.samples()) {
             md.append("| k=").append(row.length())
                     .append(" share | ").append(String.format(Locale.ROOT, "%.4f", row.uniqueShare())).append(" |\n");
         }
         md.append('\n');
-        md.append("`").append(lineMajorities.toTextRow()).append("`\n\n");
+        md.append("`").append(lineNears.toTextRow()).append("`\n\n");
 
         md.append("## Frame remainder\n\n");
-        md.append("Line-rise remainder: riseAt **").append(lineRises.riseAt())
+        md.append("Line-majority remainder: majorityAt **").append(lineMajorities.majorityAt())
+                .append("**, share **")
+                .append(String.format(Locale.ROOT, "%.4f", lineMajorities.shareAtMajority()))
+                .append("**. Line-rise remainder: riseAt **").append(lineRises.riseAt())
                 .append("**, gain **")
                 .append(String.format(Locale.ROOT, "%.4f", lineRises.gain()))
                 .append("**, share at rise **")
@@ -455,7 +463,7 @@ public final class DnaReportService {
                 .append("**.\n\n");
 
         md.append("## Extracted tape rules\n\n");
-        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks, lineRunways, lineRises, lineMajorities);
+        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks, lineRunways, lineRises, lineMajorities, lineNears);
 
         md.append("## Codebase snapshot\n\n");
         md.append(javaSources.size()).append(" Java source files under `src/main/java`:\n\n");
@@ -470,14 +478,13 @@ public final class DnaReportService {
 
         md.append("## Growth notes for the next iteration\n\n");
         md.append("- Dominant canonical base: **").append(dominantBase(sequence)).append("**.\n");
-        md.append("- Line majority: majorityAt **").append(lineMajorities.majorityAt())
+        md.append("- Line near: nearAt **").append(lineNears.nearAt())
+                .append("**, share **")
+                .append(String.format(Locale.ROOT, "%.4f", lineNears.shareAtNear()))
+                .append("**. Line-majority remainder: majorityAt **").append(lineMajorities.majorityAt())
                 .append("**, share **")
                 .append(String.format(Locale.ROOT, "%.4f", lineMajorities.shareAtMajority()))
-                .append("**. Line-rise remainder: riseAt **").append(lineRises.riseAt())
-                .append("**, gain **")
-                .append(String.format(Locale.ROOT, "%.4f", lineRises.gain()))
-                .append("**, cliffAt **").append(lineRises.cliffAt())
-                .append("**. If majorityAt equals riseAt, uniqueness is DNA-tight; if it sits past riseAt, keep walking after the steepest jump.\n");
+                .append("**. If nearAt equals majorityAt, uniqueness is DNA-tight; if it sits past majorityAt, keep walking after half-unique.\n");
         md.append("- Reverse-only remainder: wrap/mean **")
                 .append(String.format(Locale.ROOT, "%.3f", phases.wrapVsMean()))
                 .append("**.\n");
@@ -522,18 +529,22 @@ public final class DnaReportService {
             LineForkCensus lineForks,
             LineRunwayCensus lineRunways,
             LineRiseCensus lineRises,
-            LineMajorityCensus lineMajorities) {
+            LineMajorityCensus lineMajorities,
+            LineNearCensus lineNears) {
         long a = sequence.canonicalCounts().getOrDefault('A', 0L);
         long t = sequence.canonicalCounts().getOrDefault('T', 0L);
-        md.append("1. **R1 Line majority.** Lines ").append(lineMajorities.lines())
-                .append(" majorityAt ").append(lineMajorities.majorityAt())
+        md.append("1. **R1 Line near.** Lines ").append(lineNears.lines())
+                .append(" nearAt ").append(lineNears.nearAt())
+                .append(" shareNear ")
+                .append(String.format(Locale.ROOT, "%.4f", lineNears.shareAtNear()))
+                .append(" majorityAt ").append(lineNears.majorityAt())
+                .append(" shareMaj ")
+                .append(String.format(Locale.ROOT, "%.4f", lineNears.shareAtMajority()))
+                .append(".\n");
+        md.append("2. **R2 Line-majority/rise remainder.** majorityAt ").append(lineMajorities.majorityAt())
                 .append(" shareMaj ")
                 .append(String.format(Locale.ROOT, "%.4f", lineMajorities.shareAtMajority()))
-                .append(" riseAt ").append(lineMajorities.riseAt())
-                .append(" shareRise ")
-                .append(String.format(Locale.ROOT, "%.4f", lineMajorities.shareAtRise()))
-                .append(".\n");
-        md.append("2. **R2 Line-rise/runway remainder.** riseAt ").append(lineRises.riseAt())
+                .append("; riseAt ").append(lineRises.riseAt())
                 .append(" gain ")
                 .append(String.format(Locale.ROOT, "%.4f", lineRises.gain()))
                 .append(" cliffAt ").append(lineRises.cliffAt())

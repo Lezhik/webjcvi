@@ -33,6 +33,7 @@ import org.webjcvi.cliff.CliffScan;
 import org.webjcvi.runway.RunwayScan;
 import org.webjcvi.rise.RiseScan;
 import org.webjcvi.majority.MajorityScan;
+import org.webjcvi.near.NearScan;
 import org.webjcvi.logs.LogAnalysisReport;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.report.DnaReport;
@@ -80,6 +81,7 @@ public class WorkspaceApiController {
     private final RunwayScan runways;
     private final RiseScan rises;
     private final MajorityScan majorities;
+    private final NearScan nears;
     private final LogAnalysisService logAnalysis;
 
     public WorkspaceApiController(
@@ -111,6 +113,7 @@ public class WorkspaceApiController {
             RunwayScan runways,
             RiseScan rises,
             MajorityScan majorities,
+            NearScan nears,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -140,6 +143,7 @@ public class WorkspaceApiController {
         this.runways = runways;
         this.rises = rises;
         this.majorities = majorities;
+        this.nears = nears;
         this.logAnalysis = logAnalysis;
     }
 
@@ -872,6 +876,29 @@ public class WorkspaceApiController {
                     body.put("shareAtRise", scan.shareAtRise());
                     body.put("lag", scan.lag());
                     body.put("pastRise", scan.pastRise());
+                    body.put("topPrefix", scan.topPrefix());
+                    body.put("topCount", scan.topCount());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/near")
+    public Mono<Map<String, Object>> profileNears(
+            @RequestParam("text") String text) {
+        return Mono.fromCallable(() -> {
+                    var scan = nears.profile(text);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("lineCount", scan.lineCount());
+                    body.put("scanned", scan.scanned());
+                    body.put("floorLength", scan.floorLength());
+                    body.put("threshold", scan.threshold());
+                    body.put("nearAt", scan.nearAt());
+                    body.put("shareAtNear", scan.shareAtNear());
+                    body.put("majorityAt", scan.majorityAt());
+                    body.put("shareAtMajority", scan.shareAtMajority());
+                    body.put("lag", scan.lag());
+                    body.put("pastMajority", scan.pastMajority());
                     body.put("topPrefix", scan.topPrefix());
                     body.put("topCount", scan.topCount());
                     return body;

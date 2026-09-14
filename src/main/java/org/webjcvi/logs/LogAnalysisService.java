@@ -31,6 +31,7 @@ import org.webjcvi.cliff.CliffScan;
 import org.webjcvi.runway.RunwayScan;
 import org.webjcvi.rise.RiseScan;
 import org.webjcvi.majority.MajorityScan;
+import org.webjcvi.near.NearScan;
 
 /**
  * Fixed-API facade over the text-processing algorithms for log analysis.
@@ -73,12 +74,13 @@ public final class LogAnalysisService {
     private final RunwayScan runways;
     private final RiseScan rises;
     private final MajorityScan majorities;
+    private final NearScan nears;
 
     public LogAnalysisService() {
         this(new BannerSplitter(), new PairDrift(), new WrapReflow(), new RareClassScanner(),
                 new RareBreakTokenizer(), new KmerStamp(), new PalindromeScan(), new StemLoop(),
                 new FuzzyFind(), new BlockContrast(), new MirrorJoint(), new SeamGuard(),
-                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan(), new RunwayScan(), new RiseScan(), new MajorityScan());
+                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan(), new RunwayScan(), new RiseScan(), new MajorityScan(), new NearScan());
     }
 
     public LogAnalysisService(
@@ -106,7 +108,8 @@ public final class LogAnalysisService {
             CliffScan cliffs,
             RunwayScan runways,
             RiseScan rises,
-            MajorityScan majorities) {
+            MajorityScan majorities,
+            NearScan nears) {
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
@@ -132,6 +135,7 @@ public final class LogAnalysisService {
         this.runways = runways;
         this.rises = rises;
         this.majorities = majorities;
+        this.nears = nears;
     }
 
     /**
@@ -385,6 +389,21 @@ public final class LogAnalysisService {
                 majorityScan.topPrefix(),
                 majorityScan.topCount());
 
+        var nearScan = nears.profile(payload);
+        var nearSection = new LogAnalysisReport.NearSection(
+                nearScan.lineCount(),
+                nearScan.scanned(),
+                nearScan.floorLength(),
+                nearScan.threshold(),
+                nearScan.nearAt(),
+                nearScan.shareAtNear(),
+                nearScan.majorityAt(),
+                nearScan.shareAtMajority(),
+                nearScan.lag(),
+                nearScan.pastMajority(),
+                nearScan.topPrefix(),
+                nearScan.topCount());
+
         LogAnalysisReport report = new LogAnalysisReport(
                 API_VERSION,
                 inputLength,
@@ -414,9 +433,10 @@ public final class LogAnalysisService {
                 cliffSection,
                 runwaySection,
                 riseSection,
-                majoritySection);
+                majoritySection,
+                nearSection);
         if (log.isDebugEnabled()) {
-            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={} affixes={} lanes={} rows={} cliffs={} runways={} rises={} majorities={}",
+            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={} affixes={} lanes={} rows={} cliffs={} runways={} rises={} majorities={} nears={}",
                     truncated,
                     tapeSection.runCount(),
                     bannerSection.sectionCount(),
@@ -441,7 +461,8 @@ public final class LogAnalysisService {
                     cliffSection.forkAt(),
                     runwaySection.runway(),
                     riseSection.riseAt(),
-                    majoritySection.majorityAt());
+                    majoritySection.majorityAt(),
+                    nearSection.nearAt());
         }
         return report;
     }

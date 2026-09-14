@@ -141,6 +141,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/runway");
                     assertThat(html).contains("/rise");
                     assertThat(html).contains("/majority");
+                    assertThat(html).contains("/near");
                 });
     }
 
@@ -1231,6 +1232,46 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void nearApiReportsFloorNearOnDistinctLines() {
+        String text = "AAAAAAAA11111111 one\nCCCCCCCC22222222 two\n";
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/near")
+                        .queryParam("text", text)
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.nearAt").isEqualTo(8)
+                .jsonPath("$.pastMajority").isEqualTo(false)
+                .jsonPath("$.threshold").isEqualTo(0.90);
+    }
+
+    @Test
+    void nearPageRenders() {
+        webTestClient.get()
+                .uri("/near")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Near-unique width"));
+    }
+
+    @Test
+    void nearPageFormReportsFloorNear() {
+        webTestClient.post()
+                .uri("/near")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=AAAAAAAA11111111+one%0ACCCCCCCC22222222+two")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("nearAt=8");
+                    assertThat(html).contains("pastMajority=false");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -1266,6 +1307,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.cliffs.forkAt").isNumber()
                 .jsonPath("$.runways.runway").isNumber()
                 .jsonPath("$.rises.riseAt").isNumber()
-                .jsonPath("$.majorities.majorityAt").isNumber();
+                .jsonPath("$.majorities.majorityAt").isNumber()
+                .jsonPath("$.nears.nearAt").isNumber();
     }
 }

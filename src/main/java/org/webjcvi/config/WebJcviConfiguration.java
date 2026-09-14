@@ -34,6 +34,7 @@ import org.webjcvi.cliff.CliffScan;
 import org.webjcvi.runway.RunwayScan;
 import org.webjcvi.rise.RiseScan;
 import org.webjcvi.majority.MajorityScan;
+import org.webjcvi.near.NearScan;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -182,6 +183,11 @@ public class WebJcviConfiguration {
     @Bean
     MajorityScan majorityScan() {
         return new MajorityScan();
+    }
+
+    @Bean
+    NearScan nearScan() {
+        return new NearScan();
     }
 
     @Bean

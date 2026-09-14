@@ -64,6 +64,7 @@ class WebJcviMcpToolsTest {
                         "profile_runways",
                         "profile_rises",
                         "profile_majorities",
+                        "profile_nears",
                         "analyze_logs",
                         "list_files",
                         "read_file");
@@ -113,7 +114,7 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Line majority");
+        assertThat(markdown).contains("Line near");
         assertThat(markdown).contains("Frame remainder");
     }
 
@@ -394,6 +395,17 @@ class WebJcviMcpToolsTest {
         String result = tools.profileMajorities(text);
         assertThat(result).contains("majorityAt=8");
         assertThat(result).contains("pastRise=false");
+        assertThat(result).doesNotContain("hidden");
+        assertThat(tools.readFile("secret.txt")).isEqualTo("2026-hidden");
+    }
+
+    @Test
+    void profileNearsDoesNotReadProjectFiles() {
+        storage.writeText("secret.txt", "2026-hidden");
+        String text = "AAAAAAAA11111111 one\nCCCCCCCC22222222 two\n";
+        String result = tools.profileNears(text);
+        assertThat(result).contains("nearAt=8");
+        assertThat(result).contains("pastMajority=false");
         assertThat(result).doesNotContain("hidden");
         assertThat(tools.readFile("secret.txt")).isEqualTo("2026-hidden");
     }
