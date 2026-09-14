@@ -35,6 +35,7 @@ import org.webjcvi.rise.RiseScan;
 import org.webjcvi.majority.MajorityScan;
 import org.webjcvi.near.NearScan;
 import org.webjcvi.residue.ResidueScan;
+import org.webjcvi.dup.DupScan;
 import org.webjcvi.logs.LogAnalysisReport;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.report.DnaReport;
@@ -84,6 +85,7 @@ public class WorkspaceApiController {
     private final MajorityScan majorities;
     private final NearScan nears;
     private final ResidueScan residues;
+    private final DupScan dups;
     private final LogAnalysisService logAnalysis;
 
     public WorkspaceApiController(
@@ -117,6 +119,7 @@ public class WorkspaceApiController {
             MajorityScan majorities,
             NearScan nears,
             ResidueScan residues,
+            DupScan dups,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -148,6 +151,7 @@ public class WorkspaceApiController {
         this.majorities = majorities;
         this.nears = nears;
         this.residues = residues;
+        this.dups = dups;
         this.logAnalysis = logAnalysis;
     }
 
@@ -929,6 +933,34 @@ public class WorkspaceApiController {
                     body.put("maxSplit", scan.maxSplit());
                     body.put("splitLag", scan.splitLag());
                     body.put("stretched", scan.stretched());
+                    body.put("topPrefix", scan.topPrefix());
+                    body.put("topCount", scan.topCount());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/dups")
+    public Mono<Map<String, Object>> profileDups(
+            @RequestParam("text") String text) {
+        return Mono.fromCallable(() -> {
+                    var scan = dups.profile(text);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("lineCount", scan.lineCount());
+                    body.put("scanned", scan.scanned());
+                    body.put("floorLength", scan.floorLength());
+                    body.put("nearAt", scan.nearAt());
+                    body.put("shareAtNear", scan.shareAtNear());
+                    body.put("residueShare", scan.residueShare());
+                    body.put("twinGroups", scan.twinGroups());
+                    body.put("twinLines", scan.twinLines());
+                    body.put("copyGroups", scan.copyGroups());
+                    body.put("copyLines", scan.copyLines());
+                    body.put("forkGroups", scan.forkGroups());
+                    body.put("forkLines", scan.forkLines());
+                    body.put("copyShare", scan.copyShare());
+                    body.put("mostlyCopies", scan.mostlyCopies());
+                    body.put("minFork", scan.minFork());
                     body.put("topPrefix", scan.topPrefix());
                     body.put("topCount", scan.topCount());
                     return body;

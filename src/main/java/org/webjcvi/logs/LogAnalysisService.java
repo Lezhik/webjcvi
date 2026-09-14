@@ -33,6 +33,7 @@ import org.webjcvi.rise.RiseScan;
 import org.webjcvi.majority.MajorityScan;
 import org.webjcvi.near.NearScan;
 import org.webjcvi.residue.ResidueScan;
+import org.webjcvi.dup.DupScan;
 
 /**
  * Fixed-API facade over the text-processing algorithms for log analysis.
@@ -77,12 +78,13 @@ public final class LogAnalysisService {
     private final MajorityScan majorities;
     private final NearScan nears;
     private final ResidueScan residues;
+    private final DupScan dups;
 
     public LogAnalysisService() {
         this(new BannerSplitter(), new PairDrift(), new WrapReflow(), new RareClassScanner(),
                 new RareBreakTokenizer(), new KmerStamp(), new PalindromeScan(), new StemLoop(),
                 new FuzzyFind(), new BlockContrast(), new MirrorJoint(), new SeamGuard(),
-                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan(), new RunwayScan(), new RiseScan(), new MajorityScan(), new NearScan(), new ResidueScan());
+                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan(), new RunwayScan(), new RiseScan(), new MajorityScan(), new NearScan(), new ResidueScan(), new DupScan());
     }
 
     public LogAnalysisService(
@@ -112,7 +114,8 @@ public final class LogAnalysisService {
             RiseScan rises,
             MajorityScan majorities,
             NearScan nears,
-            ResidueScan residues) {
+            ResidueScan residues,
+            DupScan dups) {
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
@@ -140,6 +143,7 @@ public final class LogAnalysisService {
         this.majorities = majorities;
         this.nears = nears;
         this.residues = residues;
+        this.dups = dups;
     }
 
     /**
@@ -426,6 +430,26 @@ public final class LogAnalysisService {
                 residueScan.topPrefix(),
                 residueScan.topCount());
 
+        var dupScan = dups.profile(payload);
+        var dupSection = new LogAnalysisReport.DupSection(
+                dupScan.lineCount(),
+                dupScan.scanned(),
+                dupScan.floorLength(),
+                dupScan.nearAt(),
+                dupScan.shareAtNear(),
+                dupScan.residueShare(),
+                dupScan.twinGroups(),
+                dupScan.twinLines(),
+                dupScan.copyGroups(),
+                dupScan.copyLines(),
+                dupScan.forkGroups(),
+                dupScan.forkLines(),
+                dupScan.copyShare(),
+                dupScan.mostlyCopies(),
+                dupScan.minFork(),
+                dupScan.topPrefix(),
+                dupScan.topCount());
+
         LogAnalysisReport report = new LogAnalysisReport(
                 API_VERSION,
                 inputLength,
@@ -457,9 +481,10 @@ public final class LogAnalysisService {
                 riseSection,
                 majoritySection,
                 nearSection,
-                residueSection);
+                residueSection,
+                dupSection);
         if (log.isDebugEnabled()) {
-            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={} affixes={} lanes={} rows={} cliffs={} runways={} rises={} majorities={} nears={} residues={}",
+            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={} affixes={} lanes={} rows={} cliffs={} runways={} rises={} majorities={} nears={} residues={} dups={}",
                     truncated,
                     tapeSection.runCount(),
                     bannerSection.sectionCount(),
@@ -486,7 +511,8 @@ public final class LogAnalysisService {
                     riseSection.riseAt(),
                     majoritySection.majorityAt(),
                     nearSection.nearAt(),
-                    residueSection.twinGroups());
+                    residueSection.twinGroups(),
+                    dupSection.copyGroups());
         }
         return report;
     }

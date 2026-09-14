@@ -37,6 +37,7 @@ import org.webjcvi.rise.RiseException;
 import org.webjcvi.majority.MajorityException;
 import org.webjcvi.near.NearException;
 import org.webjcvi.residue.ResidueException;
+import org.webjcvi.dup.DupException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
@@ -207,6 +208,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> residue(ResidueException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "residue", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(DupException.class)
+    ResponseEntity<Map<String, String>> dup(DupException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "dup", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

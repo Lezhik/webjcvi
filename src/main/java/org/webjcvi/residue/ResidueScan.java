@@ -145,7 +145,7 @@ public final class ResidueScan {
         return lines;
     }
 
-    static int forkAt(List<String> members) {
+    public static int forkAt(List<String> members) {
         int maxLen = 0;
         for (String member : members) {
             if (member.length() > maxLen) {

@@ -143,6 +143,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/majority");
                     assertThat(html).contains("/near");
                     assertThat(html).contains("/residue");
+                    assertThat(html).contains("/dups");
                 });
     }
 
@@ -1313,6 +1314,46 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void dupsApiReportsNoCopiesOnDistinctLines() {
+        String text = "AAAAAAAA11111111 one\nCCCCCCCC22222222 two\n";
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/dups")
+                        .queryParam("text", text)
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.nearAt").isEqualTo(8)
+                .jsonPath("$.copyGroups").isEqualTo(0)
+                .jsonPath("$.mostlyCopies").isEqualTo(false);
+    }
+
+    @Test
+    void dupsPageRenders() {
+        webTestClient.get()
+                .uri("/dups")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Leftover copies"));
+    }
+
+    @Test
+    void dupsPageFormReportsNoCopies() {
+        webTestClient.post()
+                .uri("/dups")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=AAAAAAAA11111111+one%0ACCCCCCCC22222222+two")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("nearAt=8");
+                    assertThat(html).contains("mostlyCopies=false");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -1350,6 +1391,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.rises.riseAt").isNumber()
                 .jsonPath("$.majorities.majorityAt").isNumber()
                 .jsonPath("$.nears.nearAt").isNumber()
-                .jsonPath("$.residues.twinGroups").isNumber();
+                .jsonPath("$.residues.twinGroups").isNumber()
+                .jsonPath("$.dups.copyGroups").isNumber();
     }
 }

@@ -36,6 +36,7 @@ import org.webjcvi.rise.RiseScan;
 import org.webjcvi.majority.MajorityScan;
 import org.webjcvi.near.NearScan;
 import org.webjcvi.residue.ResidueScan;
+import org.webjcvi.dup.DupScan;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -194,6 +195,11 @@ public class WebJcviConfiguration {
     @Bean
     ResidueScan residueScan() {
         return new ResidueScan();
+    }
+
+    @Bean
+    DupScan dupScan() {
+        return new DupScan();
     }
 
     @Bean
