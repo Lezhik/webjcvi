@@ -65,6 +65,7 @@ class WebJcviMcpToolsTest {
                         "profile_rises",
                         "profile_majorities",
                         "profile_nears",
+                        "profile_residues",
                         "analyze_logs",
                         "list_files",
                         "read_file");
@@ -114,7 +115,7 @@ class WebJcviMcpToolsTest {
         String markdown = roomyTools.readDnaReport();
         assertThat(markdown).contains("WebJCVI DNA Report");
         assertThat(markdown).contains("ATGC");
-        assertThat(markdown).contains("Line near");
+        assertThat(markdown).contains("Line residue");
         assertThat(markdown).contains("Frame remainder");
     }
 

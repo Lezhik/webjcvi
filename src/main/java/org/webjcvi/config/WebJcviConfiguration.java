@@ -35,6 +35,7 @@ import org.webjcvi.runway.RunwayScan;
 import org.webjcvi.rise.RiseScan;
 import org.webjcvi.majority.MajorityScan;
 import org.webjcvi.near.NearScan;
+import org.webjcvi.residue.ResidueScan;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -188,6 +189,11 @@ public class WebJcviConfiguration {
     @Bean
     NearScan nearScan() {
         return new NearScan();
+    }
+
+    @Bean
+    ResidueScan residueScan() {
+        return new ResidueScan();
     }
 
     @Bean

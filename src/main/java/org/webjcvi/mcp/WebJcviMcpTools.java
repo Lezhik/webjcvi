@@ -58,11 +58,13 @@ import org.webjcvi.runway.RunwayException;
 import org.webjcvi.rise.RiseException;
 import org.webjcvi.majority.MajorityException;
 import org.webjcvi.near.NearException;
+import org.webjcvi.residue.ResidueException;
 import org.webjcvi.cliff.CliffScan;
 import org.webjcvi.runway.RunwayScan;
 import org.webjcvi.rise.RiseScan;
 import org.webjcvi.majority.MajorityScan;
 import org.webjcvi.near.NearScan;
+import org.webjcvi.residue.ResidueScan;
 import org.webjcvi.logs.LogAnalysisService;
 
 /**
@@ -102,6 +104,7 @@ public class WebJcviMcpTools {
     private final RiseScan rises;
     private final MajorityScan majorities;
     private final NearScan nears;
+    private final ResidueScan residues;
     private final LogAnalysisService logAnalysis;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
@@ -109,7 +112,7 @@ public class WebJcviMcpTools {
                 new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer(), new KmerStamp(),
                 new PalindromeScan(), new StemLoop(), new FuzzyFind(), new BlockContrast(),
                 new MirrorJoint(), new SeamGuard(), new PhaseJoint(), new FrameFields(),
-                new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan(), new RunwayScan(), new RiseScan(), new MajorityScan(), new NearScan(), new LogAnalysisService());
+                new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan(), new RunwayScan(), new RiseScan(), new MajorityScan(), new NearScan(), new ResidueScan(), new LogAnalysisService());
     }
 
     @Autowired
@@ -143,6 +146,7 @@ public class WebJcviMcpTools {
             RiseScan rises,
             MajorityScan majorities,
             NearScan nears,
+            ResidueScan residues,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -173,6 +177,7 @@ public class WebJcviMcpTools {
         this.rises = rises;
         this.majorities = majorities;
         this.nears = nears;
+        this.residues = residues;
         this.logAnalysis = logAnalysis;
     }
 
@@ -741,6 +746,12 @@ public class WebJcviMcpTools {
         return run(() -> nears.profile(text).summary());
     }
 
+    @Tool(name = "profile_residues", description = "List leftover colliding prefixes after the 0.90 near-unique width on newline-delimited lines. If stretched (splitLag greater than 2), start an identifier at modalSplit rather than at nearAt. Not the DNA file and not a project path.")
+    public String profileResidues(
+            @ToolParam(description = "Arbitrary text to scan") String text) {
+        return run(() -> residues.profile(text).summary());
+    }
+
     @Tool(name = "analyze_logs", description = "Analyze caller-supplied log text with the shared log-analysis facade. Returns a JSON report. Not the DNA file. Truncates at 524288 characters.")
     public String analyzeLogs(
             @ToolParam(description = "Log text to analyze") String text) {
@@ -772,7 +783,7 @@ public class WebJcviMcpTools {
             return action.execute();
         } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException
                  | RareException | TokenException | StampException | FoldException | LoopException
-                 | FuzzyException | ContrastException | MirrorException | SeamException | PhaseException | FrameException | CloneException | PrefixException | KeyException | ForkException | AffixException | LaneException | RowException | CliffException | RunwayException | RiseException | MajorityException | NearException e) {
+                 | FuzzyException | ContrastException | MirrorException | SeamException | PhaseException | FrameException | CloneException | PrefixException | KeyException | ForkException | AffixException | LaneException | RowException | CliffException | RunwayException | RiseException | MajorityException | NearException | ResidueException e) {
             return "Error: " + e.getMessage();
         }
     }

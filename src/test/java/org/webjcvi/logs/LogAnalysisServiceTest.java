@@ -44,7 +44,8 @@ class LogAnalysisServiceTest {
             "runways",
             "rises",
             "majorities",
-            "nears");
+            "nears",
+            "residues");
     private static final List<String> RISE_KEYS = List.of(
             "lineCount", "scanned", "floorLength", "riseAt", "gain",
             "shareAtRise", "shareAt16", "cliffAt", "pastClock", "topPrefix", "topCount");
@@ -54,6 +55,10 @@ class LogAnalysisServiceTest {
     private static final List<String> NEAR_KEYS = List.of(
             "lineCount", "scanned", "floorLength", "threshold", "nearAt",
             "shareAtNear", "majorityAt", "shareAtMajority", "lag", "pastMajority", "topPrefix", "topCount");
+    private static final List<String> RESIDUE_KEYS = List.of(
+            "lineCount", "scanned", "floorLength", "nearAt", "shareAtNear",
+            "residueShare", "twinGroups", "twinLines", "minSplit", "modalSplit",
+            "maxSplit", "splitLag", "stretched", "topPrefix", "topCount");
 
     private static final List<String> TAPE_KEYS = List.of("length", "runCount", "longestRun");
     private static final List<String> BANNER_KEYS = List.of("sectionCount", "minRun");
@@ -150,6 +155,7 @@ class LogAnalysisServiceTest {
         assertThat(root.get("rises").fieldNames()).toIterable().containsExactlyElementsOf(RISE_KEYS);
         assertThat(root.get("majorities").fieldNames()).toIterable().containsExactlyElementsOf(MAJORITY_KEYS);
         assertThat(root.get("nears").fieldNames()).toIterable().containsExactlyElementsOf(NEAR_KEYS);
+        assertThat(root.get("residues").fieldNames()).toIterable().containsExactlyElementsOf(RESIDUE_KEYS);
         assertThat(root.get("tape").get("length").intValue()).isEqualTo(sample.length());
         assertThat(root.get("banners").get("sectionCount").intValue()).isGreaterThanOrEqualTo(1);
         assertThat(root.get("spans").get("spanCount").intValue()).isGreaterThanOrEqualTo(1);

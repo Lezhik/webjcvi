@@ -142,6 +142,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/rise");
                     assertThat(html).contains("/majority");
                     assertThat(html).contains("/near");
+                    assertThat(html).contains("/residue");
                 });
     }
 
@@ -1272,6 +1273,46 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void residueApiReportsNoTwinsOnDistinctLines() {
+        String text = "AAAAAAAA11111111 one\nCCCCCCCC22222222 two\n";
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/residue")
+                        .queryParam("text", text)
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.nearAt").isEqualTo(8)
+                .jsonPath("$.twinGroups").isEqualTo(0)
+                .jsonPath("$.stretched").isEqualTo(false);
+    }
+
+    @Test
+    void residuePageRenders() {
+        webTestClient.get()
+                .uri("/residue")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Near residue"));
+    }
+
+    @Test
+    void residuePageFormReportsNoTwins() {
+        webTestClient.post()
+                .uri("/residue")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=AAAAAAAA11111111+one%0ACCCCCCCC22222222+two")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("nearAt=8");
+                    assertThat(html).contains("stretched=false");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -1308,6 +1349,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.runways.runway").isNumber()
                 .jsonPath("$.rises.riseAt").isNumber()
                 .jsonPath("$.majorities.majorityAt").isNumber()
-                .jsonPath("$.nears.nearAt").isNumber();
+                .jsonPath("$.nears.nearAt").isNumber()
+                .jsonPath("$.residues.twinGroups").isNumber();
     }
 }

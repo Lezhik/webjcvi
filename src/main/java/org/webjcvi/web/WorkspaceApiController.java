@@ -34,6 +34,7 @@ import org.webjcvi.runway.RunwayScan;
 import org.webjcvi.rise.RiseScan;
 import org.webjcvi.majority.MajorityScan;
 import org.webjcvi.near.NearScan;
+import org.webjcvi.residue.ResidueScan;
 import org.webjcvi.logs.LogAnalysisReport;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.report.DnaReport;
@@ -82,6 +83,7 @@ public class WorkspaceApiController {
     private final RiseScan rises;
     private final MajorityScan majorities;
     private final NearScan nears;
+    private final ResidueScan residues;
     private final LogAnalysisService logAnalysis;
 
     public WorkspaceApiController(
@@ -114,6 +116,7 @@ public class WorkspaceApiController {
             RiseScan rises,
             MajorityScan majorities,
             NearScan nears,
+            ResidueScan residues,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -144,6 +147,7 @@ public class WorkspaceApiController {
         this.rises = rises;
         this.majorities = majorities;
         this.nears = nears;
+        this.residues = residues;
         this.logAnalysis = logAnalysis;
     }
 
@@ -899,6 +903,32 @@ public class WorkspaceApiController {
                     body.put("shareAtMajority", scan.shareAtMajority());
                     body.put("lag", scan.lag());
                     body.put("pastMajority", scan.pastMajority());
+                    body.put("topPrefix", scan.topPrefix());
+                    body.put("topCount", scan.topCount());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/residue")
+    public Mono<Map<String, Object>> profileResidues(
+            @RequestParam("text") String text) {
+        return Mono.fromCallable(() -> {
+                    var scan = residues.profile(text);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("lineCount", scan.lineCount());
+                    body.put("scanned", scan.scanned());
+                    body.put("floorLength", scan.floorLength());
+                    body.put("nearAt", scan.nearAt());
+                    body.put("shareAtNear", scan.shareAtNear());
+                    body.put("residueShare", scan.residueShare());
+                    body.put("twinGroups", scan.twinGroups());
+                    body.put("twinLines", scan.twinLines());
+                    body.put("minSplit", scan.minSplit());
+                    body.put("modalSplit", scan.modalSplit());
+                    body.put("maxSplit", scan.maxSplit());
+                    body.put("splitLag", scan.splitLag());
+                    body.put("stretched", scan.stretched());
                     body.put("topPrefix", scan.topPrefix());
                     body.put("topCount", scan.topCount());
                     return body;

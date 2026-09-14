@@ -32,6 +32,7 @@ import org.webjcvi.runway.RunwayScan;
 import org.webjcvi.rise.RiseScan;
 import org.webjcvi.majority.MajorityScan;
 import org.webjcvi.near.NearScan;
+import org.webjcvi.residue.ResidueScan;
 
 /**
  * Fixed-API facade over the text-processing algorithms for log analysis.
@@ -75,12 +76,13 @@ public final class LogAnalysisService {
     private final RiseScan rises;
     private final MajorityScan majorities;
     private final NearScan nears;
+    private final ResidueScan residues;
 
     public LogAnalysisService() {
         this(new BannerSplitter(), new PairDrift(), new WrapReflow(), new RareClassScanner(),
                 new RareBreakTokenizer(), new KmerStamp(), new PalindromeScan(), new StemLoop(),
                 new FuzzyFind(), new BlockContrast(), new MirrorJoint(), new SeamGuard(),
-                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan(), new RunwayScan(), new RiseScan(), new MajorityScan(), new NearScan());
+                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan(), new RunwayScan(), new RiseScan(), new MajorityScan(), new NearScan(), new ResidueScan());
     }
 
     public LogAnalysisService(
@@ -109,7 +111,8 @@ public final class LogAnalysisService {
             RunwayScan runways,
             RiseScan rises,
             MajorityScan majorities,
-            NearScan nears) {
+            NearScan nears,
+            ResidueScan residues) {
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
@@ -136,6 +139,7 @@ public final class LogAnalysisService {
         this.rises = rises;
         this.majorities = majorities;
         this.nears = nears;
+        this.residues = residues;
     }
 
     /**
@@ -404,6 +408,24 @@ public final class LogAnalysisService {
                 nearScan.topPrefix(),
                 nearScan.topCount());
 
+        var residueScan = residues.profile(payload);
+        var residueSection = new LogAnalysisReport.ResidueSection(
+                residueScan.lineCount(),
+                residueScan.scanned(),
+                residueScan.floorLength(),
+                residueScan.nearAt(),
+                residueScan.shareAtNear(),
+                residueScan.residueShare(),
+                residueScan.twinGroups(),
+                residueScan.twinLines(),
+                residueScan.minSplit(),
+                residueScan.modalSplit(),
+                residueScan.maxSplit(),
+                residueScan.splitLag(),
+                residueScan.stretched(),
+                residueScan.topPrefix(),
+                residueScan.topCount());
+
         LogAnalysisReport report = new LogAnalysisReport(
                 API_VERSION,
                 inputLength,
@@ -434,9 +456,10 @@ public final class LogAnalysisService {
                 runwaySection,
                 riseSection,
                 majoritySection,
-                nearSection);
+                nearSection,
+                residueSection);
         if (log.isDebugEnabled()) {
-            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={} affixes={} lanes={} rows={} cliffs={} runways={} rises={} majorities={} nears={}",
+            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={} affixes={} lanes={} rows={} cliffs={} runways={} rises={} majorities={} nears={} residues={}",
                     truncated,
                     tapeSection.runCount(),
                     bannerSection.sectionCount(),
@@ -462,7 +485,8 @@ public final class LogAnalysisService {
                     runwaySection.runway(),
                     riseSection.riseAt(),
                     majoritySection.majorityAt(),
-                    nearSection.nearAt());
+                    nearSection.nearAt(),
+                    residueSection.twinGroups());
         }
         return report;
     }

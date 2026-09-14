@@ -36,6 +36,7 @@ import org.webjcvi.runway.RunwayException;
 import org.webjcvi.rise.RiseException;
 import org.webjcvi.majority.MajorityException;
 import org.webjcvi.near.NearException;
+import org.webjcvi.residue.ResidueException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
@@ -200,6 +201,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> near(NearException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "near", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(ResidueException.class)
+    ResponseEntity<Map<String, String>> residue(ResidueException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "residue", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)
