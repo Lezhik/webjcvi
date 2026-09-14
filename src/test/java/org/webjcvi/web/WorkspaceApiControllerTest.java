@@ -140,6 +140,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/cliff");
                     assertThat(html).contains("/runway");
                     assertThat(html).contains("/rise");
+                    assertThat(html).contains("/majority");
                 });
     }
 
@@ -1190,6 +1191,46 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void majorityApiReportsFloorMajorityOnDistinctLines() {
+        String text = "AAAAAAAA11111111 one\nCCCCCCCC22222222 two\n";
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/majority")
+                        .queryParam("text", text)
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.majorityAt").isEqualTo(8)
+                .jsonPath("$.pastRise").isEqualTo(false)
+                .jsonPath("$.threshold").isEqualTo(0.5);
+    }
+
+    @Test
+    void majorityPageRenders() {
+        webTestClient.get()
+                .uri("/majority")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Majority width"));
+    }
+
+    @Test
+    void majorityPageFormReportsFloorMajority() {
+        webTestClient.post()
+                .uri("/majority")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=AAAAAAAA11111111+one%0ACCCCCCCC22222222+two")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("majorityAt=8");
+                    assertThat(html).contains("pastRise=false");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -1224,6 +1265,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.rows.uniqueShareAt16").isNumber()
                 .jsonPath("$.cliffs.forkAt").isNumber()
                 .jsonPath("$.runways.runway").isNumber()
-                .jsonPath("$.rises.riseAt").isNumber();
+                .jsonPath("$.rises.riseAt").isNumber()
+                .jsonPath("$.majorities.majorityAt").isNumber();
     }
 }

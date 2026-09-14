@@ -34,6 +34,7 @@ import org.webjcvi.row.RowException;
 import org.webjcvi.cliff.CliffException;
 import org.webjcvi.runway.RunwayException;
 import org.webjcvi.rise.RiseException;
+import org.webjcvi.majority.MajorityException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
@@ -186,6 +187,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> rise(RiseException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "rise", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(MajorityException.class)
+    ResponseEntity<Map<String, String>> majority(MajorityException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "majority", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

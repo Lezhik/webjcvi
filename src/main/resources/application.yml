@@ -15,8 +15,8 @@ spring:
           and enforce a 500 MB per-file size limit. Use regenerate_dna_report,
           read_dna_report, tape_load, tape_find, tape_runs, split_banners,
           pair_drift, unwrap_wraps, rare_islands, cut_tokens, kmer_stamps,
-          find_palindromes, extract_spans, fuzzy_find, block_contrast, find_mirrors, flag_seams, phase_mirrors, extract_fields, find_clones, group_prefixes, measure_key_width, find_forks, compare_affixes, profile_lanes, profile_rows, profile_cliffs, profile_runways, profile_rises, analyze_logs, list_files, and read_file. Caller-text tools
-          (tape, split, drift, unwrap, rare, tokens, stamps, fold, loop, fuzzy, contrast, mirrors, seams, phase, fields, clones, prefixes, keys, forks, affixes, lanes, rows, cliffs, runways, rises, log analysis) operate
+          find_palindromes, extract_spans, fuzzy_find, block_contrast, find_mirrors, flag_seams, phase_mirrors, extract_fields, find_clones, group_prefixes, measure_key_width, find_forks, compare_affixes, profile_lanes, profile_rows, profile_cliffs, profile_runways, profile_rises, profile_majorities, analyze_logs, list_files, and read_file. Caller-text tools
+          (tape, split, drift, unwrap, rare, tokens, stamps, fold, loop, fuzzy, contrast, mirrors, seams, phase, fields, clones, prefixes, keys, forks, affixes, lanes, rows, cliffs, runways, rises, majorities, log analysis) operate
           on in-memory text, not DNA and not project files.
         annotation-scanner:
           enabled: false

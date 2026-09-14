@@ -58,6 +58,7 @@
         <p><a href="/cliff">Clock cliff</a> (where colliding line prefixes first fork, past a timestamp).</p>
         <p><a href="/runway">Layout runway</a> (gap from first fork to uniqueness cliff — strip layout, start the id at cliffAt).</p>
         <p><a href="/rise">Uniqueness rise</a> (steepest unique-share jump, even when uniqueness never reaches 0.99).</p>
+        <p><a href="/majority">Majority width</a> (smallest prefix k whose unique share is at least 0.5 — use when the steepest jump is not yet an identifier).</p>
         <form method="post" action="/report/regenerate">
             <button type="submit">Regenerate report</button>
         </form>

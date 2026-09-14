@@ -33,6 +33,7 @@ import org.webjcvi.row.RowScan;
 import org.webjcvi.cliff.CliffScan;
 import org.webjcvi.runway.RunwayScan;
 import org.webjcvi.rise.RiseScan;
+import org.webjcvi.majority.MajorityScan;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -176,6 +177,11 @@ public class WebJcviConfiguration {
     @Bean
     RiseScan riseScan() {
         return new RiseScan();
+    }
+
+    @Bean
+    MajorityScan majorityScan() {
+        return new MajorityScan();
     }
 
     @Bean

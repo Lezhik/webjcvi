@@ -30,6 +30,7 @@ import org.webjcvi.row.RowScan;
 import org.webjcvi.cliff.CliffScan;
 import org.webjcvi.runway.RunwayScan;
 import org.webjcvi.rise.RiseScan;
+import org.webjcvi.majority.MajorityScan;
 
 /**
  * Fixed-API facade over the text-processing algorithms for log analysis.
@@ -71,12 +72,13 @@ public final class LogAnalysisService {
     private final CliffScan cliffs;
     private final RunwayScan runways;
     private final RiseScan rises;
+    private final MajorityScan majorities;
 
     public LogAnalysisService() {
         this(new BannerSplitter(), new PairDrift(), new WrapReflow(), new RareClassScanner(),
                 new RareBreakTokenizer(), new KmerStamp(), new PalindromeScan(), new StemLoop(),
                 new FuzzyFind(), new BlockContrast(), new MirrorJoint(), new SeamGuard(),
-                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan(), new RunwayScan(), new RiseScan());
+                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan(), new RunwayScan(), new RiseScan(), new MajorityScan());
     }
 
     public LogAnalysisService(
@@ -103,7 +105,8 @@ public final class LogAnalysisService {
             RowScan rows,
             CliffScan cliffs,
             RunwayScan runways,
-            RiseScan rises) {
+            RiseScan rises,
+            MajorityScan majorities) {
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
@@ -128,6 +131,7 @@ public final class LogAnalysisService {
         this.cliffs = cliffs;
         this.runways = runways;
         this.rises = rises;
+        this.majorities = majorities;
     }
 
     /**
@@ -366,6 +370,21 @@ public final class LogAnalysisService {
                 riseScan.topPrefix(),
                 riseScan.topCount());
 
+        var majorityScan = majorities.profile(payload);
+        var majoritySection = new LogAnalysisReport.MajoritySection(
+                majorityScan.lineCount(),
+                majorityScan.scanned(),
+                majorityScan.floorLength(),
+                majorityScan.threshold(),
+                majorityScan.majorityAt(),
+                majorityScan.shareAtMajority(),
+                majorityScan.riseAt(),
+                majorityScan.shareAtRise(),
+                majorityScan.lag(),
+                majorityScan.pastRise(),
+                majorityScan.topPrefix(),
+                majorityScan.topCount());
+
         LogAnalysisReport report = new LogAnalysisReport(
                 API_VERSION,
                 inputLength,
@@ -394,9 +413,10 @@ public final class LogAnalysisService {
                 rowSection,
                 cliffSection,
                 runwaySection,
-                riseSection);
+                riseSection,
+                majoritySection);
         if (log.isDebugEnabled()) {
-            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={} affixes={} lanes={} rows={} cliffs={} runways={} rises={}",
+            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={} affixes={} lanes={} rows={} cliffs={} runways={} rises={} majorities={}",
                     truncated,
                     tapeSection.runCount(),
                     bannerSection.sectionCount(),
@@ -420,7 +440,8 @@ public final class LogAnalysisService {
                     rowSection.uniqueShareAt16(),
                     cliffSection.forkAt(),
                     runwaySection.runway(),
-                    riseSection.riseAt());
+                    riseSection.riseAt(),
+                    majoritySection.majorityAt());
         }
         return report;
     }

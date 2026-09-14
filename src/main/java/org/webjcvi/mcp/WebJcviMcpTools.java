@@ -56,9 +56,11 @@ import org.webjcvi.row.RowScan;
 import org.webjcvi.cliff.CliffException;
 import org.webjcvi.runway.RunwayException;
 import org.webjcvi.rise.RiseException;
+import org.webjcvi.majority.MajorityException;
 import org.webjcvi.cliff.CliffScan;
 import org.webjcvi.runway.RunwayScan;
 import org.webjcvi.rise.RiseScan;
+import org.webjcvi.majority.MajorityScan;
 import org.webjcvi.logs.LogAnalysisService;
 
 /**
@@ -96,6 +98,7 @@ public class WebJcviMcpTools {
     private final CliffScan cliffs;
     private final RunwayScan runways;
     private final RiseScan rises;
+    private final MajorityScan majorities;
     private final LogAnalysisService logAnalysis;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
@@ -103,7 +106,7 @@ public class WebJcviMcpTools {
                 new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer(), new KmerStamp(),
                 new PalindromeScan(), new StemLoop(), new FuzzyFind(), new BlockContrast(),
                 new MirrorJoint(), new SeamGuard(), new PhaseJoint(), new FrameFields(),
-                new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan(), new RunwayScan(), new RiseScan(), new LogAnalysisService());
+                new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan(), new RunwayScan(), new RiseScan(), new MajorityScan(), new LogAnalysisService());
     }
 
     @Autowired
@@ -135,6 +138,7 @@ public class WebJcviMcpTools {
             CliffScan cliffs,
             RunwayScan runways,
             RiseScan rises,
+            MajorityScan majorities,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -163,6 +167,7 @@ public class WebJcviMcpTools {
         this.cliffs = cliffs;
         this.runways = runways;
         this.rises = rises;
+        this.majorities = majorities;
         this.logAnalysis = logAnalysis;
     }
 
@@ -719,6 +724,12 @@ public class WebJcviMcpTools {
         return run(() -> rises.profile(text).summary());
     }
 
+    @Tool(name = "profile_majorities", description = "Find the smallest prefix length whose unique share is at least 0.5 on newline-delimited lines. If pastRise (majorityAt greater than riseAt), start an identifier there rather than at the steepest jump. Not the DNA file and not a project path.")
+    public String profileMajorities(
+            @ToolParam(description = "Arbitrary text to scan") String text) {
+        return run(() -> majorities.profile(text).summary());
+    }
+
     @Tool(name = "analyze_logs", description = "Analyze caller-supplied log text with the shared log-analysis facade. Returns a JSON report. Not the DNA file. Truncates at 524288 characters.")
     public String analyzeLogs(
             @ToolParam(description = "Log text to analyze") String text) {
@@ -750,7 +761,7 @@ public class WebJcviMcpTools {
             return action.execute();
         } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException
                  | RareException | TokenException | StampException | FoldException | LoopException
-                 | FuzzyException | ContrastException | MirrorException | SeamException | PhaseException | FrameException | CloneException | PrefixException | KeyException | ForkException | AffixException | LaneException | RowException | CliffException | RunwayException | RiseException e) {
+                 | FuzzyException | ContrastException | MirrorException | SeamException | PhaseException | FrameException | CloneException | PrefixException | KeyException | ForkException | AffixException | LaneException | RowException | CliffException | RunwayException | RiseException | MajorityException e) {
             return "Error: " + e.getMessage();
         }
     }
