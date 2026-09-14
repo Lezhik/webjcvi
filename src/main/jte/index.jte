@@ -62,6 +62,7 @@
         <p><a href="/near">Near-unique width</a> (smallest prefix k whose unique share is at least 0.90 — use when half-unique is not yet a key and 0.99 never arrives).</p>
         <p><a href="/residue">Near residue</a> (leftover colliding prefixes after unique share 0.90 — use when near-unique still leaves twins, instead of waiting for 0.99).</p>
         <p><a href="/dups">Leftover copies</a> (exact duplicate leftover lines after 0.90 versus twins that still fork — use when stretched is false because leftover is copies).</p>
+        <p><a href="/linger">Leftover linger</a> (leftover twin groups that persist past lag 2 after 0.90 — use when mostlyCopies is true but a long-lag tail still lingers).</p>
         <form method="post" action="/report/regenerate">
             <button type="submit">Regenerate report</button>
         </form>

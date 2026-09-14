@@ -46,7 +46,8 @@ class LogAnalysisServiceTest {
             "majorities",
             "nears",
             "residues",
-            "dups");
+            "dups",
+            "lingers");
     private static final List<String> RISE_KEYS = List.of(
             "lineCount", "scanned", "floorLength", "riseAt", "gain",
             "shareAtRise", "shareAt16", "cliffAt", "pastClock", "topPrefix", "topCount");
@@ -65,6 +66,10 @@ class LogAnalysisServiceTest {
             "residueShare", "twinGroups", "twinLines", "copyGroups", "copyLines",
             "forkGroups", "forkLines", "copyShare", "mostlyCopies", "minFork",
             "topPrefix", "topCount");
+    private static final List<String> LINGER_KEYS = List.of(
+            "lineCount", "scanned", "floorLength", "nearAt", "twinGroups",
+            "lag0", "lag1", "lag2", "lagLong", "modalLag", "maxLag",
+            "longShare", "longTail", "copyShare", "mostlyCopies");
 
     private static final List<String> TAPE_KEYS = List.of("length", "runCount", "longestRun");
     private static final List<String> BANNER_KEYS = List.of("sectionCount", "minRun");
@@ -163,6 +168,7 @@ class LogAnalysisServiceTest {
         assertThat(root.get("nears").fieldNames()).toIterable().containsExactlyElementsOf(NEAR_KEYS);
         assertThat(root.get("residues").fieldNames()).toIterable().containsExactlyElementsOf(RESIDUE_KEYS);
         assertThat(root.get("dups").fieldNames()).toIterable().containsExactlyElementsOf(DUP_KEYS);
+        assertThat(root.get("lingers").fieldNames()).toIterable().containsExactlyElementsOf(LINGER_KEYS);
         assertThat(root.get("tape").get("length").intValue()).isEqualTo(sample.length());
         assertThat(root.get("banners").get("sectionCount").intValue()).isGreaterThanOrEqualTo(1);
         assertThat(root.get("spans").get("spanCount").intValue()).isGreaterThanOrEqualTo(1);

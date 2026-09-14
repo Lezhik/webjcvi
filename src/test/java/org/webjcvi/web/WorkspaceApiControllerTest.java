@@ -144,6 +144,7 @@ class WorkspaceApiControllerTest {
                     assertThat(html).contains("/near");
                     assertThat(html).contains("/residue");
                     assertThat(html).contains("/dups");
+                    assertThat(html).contains("/linger");
                 });
     }
 
@@ -1354,6 +1355,46 @@ class WorkspaceApiControllerTest {
     }
 
     @Test
+    void lingerApiReportsNoLongTailOnDistinctLines() {
+        String text = "AAAAAAAA11111111 one\nCCCCCCCC22222222 two\n";
+        webTestClient.post()
+                .uri(uri -> uri.path("/api/linger")
+                        .queryParam("text", text)
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.nearAt").isEqualTo(8)
+                .jsonPath("$.lagLong").isEqualTo(0)
+                .jsonPath("$.longTail").isEqualTo(false);
+    }
+
+    @Test
+    void lingerPageRenders() {
+        webTestClient.get()
+                .uri("/linger")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> assertThat(html).contains("Leftover linger"));
+    }
+
+    @Test
+    void lingerPageFormReportsNoLongTail() {
+        webTestClient.post()
+                .uri("/linger")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .bodyValue("text=AAAAAAAA11111111+one%0ACCCCCCCC22222222+two")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(html -> {
+                    assertThat(html).contains("nearAt=8");
+                    assertThat(html).contains("longTail=false");
+                });
+    }
+
+    @Test
     void logsAnalyzeApiReturnsFixedJsonContract() {
         webTestClient.post()
                 .uri(uri -> uri.path("/api/logs/analyze")
@@ -1392,6 +1433,7 @@ class WorkspaceApiControllerTest {
                 .jsonPath("$.majorities.majorityAt").isNumber()
                 .jsonPath("$.nears.nearAt").isNumber()
                 .jsonPath("$.residues.twinGroups").isNumber()
-                .jsonPath("$.dups.copyGroups").isNumber();
+                .jsonPath("$.dups.copyGroups").isNumber()
+                .jsonPath("$.lingers.lagLong").isNumber();
     }
 }

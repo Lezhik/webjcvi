@@ -37,6 +37,7 @@ import org.webjcvi.majority.MajorityScan;
 import org.webjcvi.near.NearScan;
 import org.webjcvi.residue.ResidueScan;
 import org.webjcvi.dup.DupScan;
+import org.webjcvi.linger.LingerScan;
 
 @Configuration
 public class WebJcviConfiguration {
@@ -200,6 +201,11 @@ public class WebJcviConfiguration {
     @Bean
     DupScan dupScan() {
         return new DupScan();
+    }
+
+    @Bean
+    LingerScan lingerScan() {
+        return new LingerScan();
     }
 
     @Bean

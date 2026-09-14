@@ -38,7 +38,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
         "majorities",
         "nears",
         "residues",
-        "dups"
+        "dups",
+        "lingers"
 })
 public record LogAnalysisReport(
         int apiVersion,
@@ -72,7 +73,8 @@ public record LogAnalysisReport(
         MajoritySection majorities,
         NearSection nears,
         ResidueSection residues,
-        DupSection dups) {
+        DupSection dups,
+        LingerSection lingers) {
 
     @JsonPropertyOrder({"length", "runCount", "longestRun"})
     public record TapeSection(int length, int runCount, int longestRun) {
@@ -368,5 +370,27 @@ public record LogAnalysisReport(
             int minFork,
             String topPrefix,
             int topCount) {
+    }
+
+    @JsonPropertyOrder({
+            "lineCount", "scanned", "floorLength", "nearAt", "twinGroups",
+            "lag0", "lag1", "lag2", "lagLong", "modalLag", "maxLag",
+            "longShare", "longTail", "copyShare", "mostlyCopies"})
+    public record LingerSection(
+            int lineCount,
+            int scanned,
+            int floorLength,
+            int nearAt,
+            int twinGroups,
+            int lag0,
+            int lag1,
+            int lag2,
+            int lagLong,
+            int modalLag,
+            int maxLag,
+            double longShare,
+            boolean longTail,
+            double copyShare,
+            boolean mostlyCopies) {
     }
 }

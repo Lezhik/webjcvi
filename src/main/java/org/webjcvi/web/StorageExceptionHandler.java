@@ -38,6 +38,7 @@ import org.webjcvi.majority.MajorityException;
 import org.webjcvi.near.NearException;
 import org.webjcvi.residue.ResidueException;
 import org.webjcvi.dup.DupException;
+import org.webjcvi.linger.LingerException;
 
 @RestControllerAdvice
 public class StorageExceptionHandler {
@@ -214,6 +215,12 @@ public class StorageExceptionHandler {
     ResponseEntity<Map<String, String>> dup(DupException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "dup", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(LingerException.class)
+    ResponseEntity<Map<String, String>> linger(LingerException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "linger", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(PathEscapeException.class)

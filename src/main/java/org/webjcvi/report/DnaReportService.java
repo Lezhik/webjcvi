@@ -44,6 +44,7 @@ import org.webjcvi.dna.LineMajorityCensus;
 import org.webjcvi.dna.LineNearCensus;
 import org.webjcvi.dna.LineResidueCensus;
 import org.webjcvi.dna.LineLagCensus;
+import org.webjcvi.dna.LineLongCensus;
 import org.webjcvi.storage.FileStorageService;
 import org.webjcvi.storage.StorageNotFoundException;
 import org.slf4j.Logger;
@@ -149,10 +150,11 @@ public final class DnaReportService {
         LineNearCensus lineNears = LineNearCensus.fromRaw(raw);
         LineResidueCensus lineResidues = LineResidueCensus.fromRaw(raw);
         LineLagCensus lineLags = LineLagCensus.fromRaw(raw);
+        LineLongCensus lineLongs = LineLongCensus.fromRaw(raw);
         Map<String, String> sections = buildSections(
-                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks, lineRunways, lineRises, lineMajorities, lineNears, lineResidues, lineLags);
+                sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks, lineRunways, lineRises, lineMajorities, lineNears, lineResidues, lineLags, lineLongs);
         String markdown = renderMarkdown(
-                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks, lineRunways, lineRises, lineMajorities, lineNears, lineResidues, lineLags);
+                sections, sequence, generatedAt, javaSources, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks, lineRunways, lineRises, lineMajorities, lineNears, lineResidues, lineLags, lineLongs);
         storage.writeText(reportRelativePath(), markdown);
         if (log.isDebugEnabled()) {
             log.debug("dna-report.regenerate.done bases={} markdownChars={} path={}",
@@ -229,7 +231,8 @@ public final class DnaReportService {
             LineMajorityCensus lineMajorities,
             LineNearCensus lineNears,
             LineResidueCensus lineResidues,
-            LineLagCensus lineLags) {
+            LineLagCensus lineLags,
+            LineLongCensus lineLongs) {
         Map<String, String> sections = new LinkedHashMap<>();
         sections.put("meta", "generatedAt=" + ISO.format(generatedAt));
         sections.put("length", Integer.toString(sequence.length()));
@@ -238,6 +241,10 @@ public final class DnaReportService {
         sections.put("invalidTotal", Long.toString(sequence.invalidTotal()));
         sections.put("javaSourceCount", Integer.toString(javaSources.size()));
         sections.put("wrapModalWidth", Integer.toString(wraps.modalWidth()));
+        sections.put("lineLongShare", String.format(Locale.ROOT, "%.4f", lineLongs.longShare()));
+        sections.put("lineMaxLag", Integer.toString(lineLongs.maxLag()));
+        sections.put("lineLagLong", Integer.toString(lineLongs.lagLong()));
+        sections.put("lineLongTail", Boolean.toString(lineLongs.longTail()));
         sections.put("lineModalLag", Integer.toString(lineLags.modalLag()));
         sections.put("lineLag0", Integer.toString(lineLags.lag0()));
         sections.put("lineLag1", Integer.toString(lineLags.lag1()));
@@ -290,17 +297,18 @@ public final class DnaReportService {
             LineMajorityCensus lineMajorities,
             LineNearCensus lineNears,
             LineResidueCensus lineResidues,
-            LineLagCensus lineLags) {
+            LineLagCensus lineLags,
+            LineLongCensus lineLongs) {
         StringBuilder md = new StringBuilder();
         md.append("# WebJCVI DNA Report\n\n");
         md.append("Generated at **").append(ISO.format(generatedAt.atOffset(ZoneOffset.UTC))).append("**.\n\n");
         md.append("This report is rebuilt from `").append(dnaRelativePath)
-                .append("` and a snapshot of the current codebase. Version 30 of the builder ")
-                .append("bins leftover colliding source-line prefixes after unique share 0.90 by splitLag: ")
-                .append("0 (exact copies), 1, 2, or longer than DNA's two-base climb. ")
-                .append("v29 leftover at nearAt=10 is all forks (copyShare 0, minFork 11); ")
-                .append("log journals then had leftover copyShare ≈ 0.62 so stretched was false. ")
-                .append("This asks how far leftover twins persist past nearAt, not whether they are copies or forks.\n\n");
+                .append("` and a snapshot of the current codebase. Version 31 of the builder ")
+                .append("measures the leftover tail after unique share 0.90: longShare = lagLong / twinGroups ")
+                .append("and maxLag, the farthest leftover splitLag. ")
+                .append("v30 leftover histogram is lag0=0 / lag1=220 / lag2=71 / lagLong=33 / modalLag=1; ")
+                .append("log journals then had mostlyCopies with still lagLong>0 (longShare ≈ 0.20, maxLag=53). ")
+                .append("This asks how thick and how far the leftover tail is, not which histogram bin wins.\n\n");
 
         md.append("## Sequence composition\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
@@ -341,25 +349,29 @@ public final class DnaReportService {
         md.append("First ").append(PREVIEW_BASES).append(" normalized bases:\n\n```\n");
         md.append(sequence.preview(PREVIEW_BASES)).append("\n```\n\n");
 
-        md.append("## Line leftover lag\n\n");
-        md.append("Source lines kept. After **nearAt**, leftover twin groups are binned by **splitLag** = forkAt − nearAt ")
-                .append("(0 if the members are identical). lag0 is copies; lag1/lag2 are DNA-tight forks; lagLong is &gt; 2. ")
-                .append("If modalLag is 0, leftover is copies (dedupe). If modalLag is 1, leftover evaporates on the next base.\n\n");
+        md.append("## Line leftover long\n\n");
+        md.append("Source lines kept. After **nearAt**, leftover twin groups that persist past DNA's two-base climb ")
+                .append("are the tail: **lagLong** groups, **longShare** = lagLong / twinGroups, **maxLag** the longest splitLag. ")
+                .append("If longTail is true, leftover does not all evaporate in two bases even when the modal bin is copies or lag 1.\n\n");
         md.append("| Metric | Value |\n| --- | --- |\n");
-        md.append("| Lines | ").append(lineLags.lines()).append(" |\n");
-        md.append("| Near at (k) | ").append(lineLags.nearAt()).append(" |\n");
-        md.append("| Share at near | ").append(String.format(Locale.ROOT, "%.4f", lineLags.shareAtNear())).append(" |\n");
-        md.append("| Twin groups | ").append(lineLags.twinGroups()).append(" |\n");
-        md.append("| Lag 0 (copies) | ").append(lineLags.lag0()).append(" |\n");
-        md.append("| Lag 1 | ").append(lineLags.lag1()).append(" |\n");
-        md.append("| Lag 2 | ").append(lineLags.lag2()).append(" |\n");
-        md.append("| Lag &gt; 2 | ").append(lineLags.lagLong()).append(" |\n");
-        md.append("| Modal lag | ").append(lineLags.modalLag()).append(" |\n");
+        md.append("| Lines | ").append(lineLongs.lines()).append(" |\n");
+        md.append("| Near at (k) | ").append(lineLongs.nearAt()).append(" |\n");
+        md.append("| Share at near | ").append(String.format(Locale.ROOT, "%.4f", lineLongs.shareAtNear())).append(" |\n");
+        md.append("| Twin groups | ").append(lineLongs.twinGroups()).append(" |\n");
+        md.append("| Lag &gt; 2 | ").append(lineLongs.lagLong()).append(" |\n");
+        md.append("| Max lag | ").append(lineLongs.maxLag()).append(" |\n");
+        md.append("| Long share | ").append(String.format(Locale.ROOT, "%.4f", lineLongs.longShare())).append(" |\n");
+        md.append("| Long tail | ").append(lineLongs.longTail()).append(" |\n");
         md.append('\n');
-        md.append("`").append(lineLags.toTextRow()).append("`\n\n");
+        md.append("`").append(lineLongs.toTextRow()).append("`\n\n");
 
         md.append("## Frame remainder\n\n");
-        md.append("Line-residue remainder: copyGroups **").append(lineResidues.copyGroups())
+        md.append("Line-lag remainder: lag0 **").append(lineLags.lag0())
+                .append("**, lag1 **").append(lineLags.lag1())
+                .append("**, lag2 **").append(lineLags.lag2())
+                .append("**, lagLong **").append(lineLags.lagLong())
+                .append("**, modalLag **").append(lineLags.modalLag())
+                .append("**. Line-residue remainder: copyGroups **").append(lineResidues.copyGroups())
                 .append("**, forkGroups **").append(lineResidues.forkGroups())
                 .append("**, copyShare **")
                 .append(String.format(Locale.ROOT, "%.4f", lineResidues.copyShare()))
@@ -487,7 +499,7 @@ public final class DnaReportService {
                 .append("**.\n\n");
 
         md.append("## Extracted tape rules\n\n");
-        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks, lineRunways, lineRises, lineMajorities, lineNears, lineResidues, lineLags);
+        appendExtractedRules(md, sequence, wraps, runs, skew, islands, joints, dimers, gcIslands, codons, lags, foldback, hairpins, mismatches, neighbors, wrapReverse, phases, mapPhases, slots, cloneCensus, prefixCensus, keyWidth, suffixCensus, interior, landscape, lineKeys, lineForks, lineRunways, lineRises, lineMajorities, lineNears, lineResidues, lineLags, lineLongs);
 
         md.append("## Codebase snapshot\n\n");
         md.append(javaSources.size()).append(" Java source files under `src/main/java`:\n\n");
@@ -502,16 +514,20 @@ public final class DnaReportService {
 
         md.append("## Growth notes for the next iteration\n\n");
         md.append("- Dominant canonical base: **").append(dominantBase(sequence)).append("**.\n");
-        md.append("- Line leftover lag: modalLag **").append(lineLags.modalLag())
+        md.append("- Line leftover long: lagLong **").append(lineLongs.lagLong())
+                .append("**, maxLag **").append(lineLongs.maxLag())
+                .append("**, longShare **")
+                .append(String.format(Locale.ROOT, "%.4f", lineLongs.longShare()))
+                .append("**, longTail **").append(lineLongs.longTail())
+                .append("**. Line-lag remainder: modalLag **").append(lineLags.modalLag())
                 .append("**, lag0 **").append(lineLags.lag0())
                 .append("**, lag1 **").append(lineLags.lag1())
                 .append("**, lag2 **").append(lineLags.lag2())
-                .append("**, lagLong **").append(lineLags.lagLong())
                 .append("**. Line-residue remainder: copyGroups **").append(lineResidues.copyGroups())
                 .append("**, forkGroups **").append(lineResidues.forkGroups())
                 .append("**, copyShare **")
                 .append(String.format(Locale.ROOT, "%.4f", lineResidues.copyShare()))
-                .append("**. If modalLag is 0, leftover is copies; if it is 1, leftover evaporates on the next base.\n");
+                .append("**. If longTail is true, leftover persists past two bases even when the modal bin is copies or lag 1.\n");
         md.append("- Reverse-only remainder: wrap/mean **")
                 .append(String.format(Locale.ROOT, "%.3f", phases.wrapVsMean()))
                 .append("**.\n");
@@ -559,21 +575,27 @@ public final class DnaReportService {
             LineMajorityCensus lineMajorities,
             LineNearCensus lineNears,
             LineResidueCensus lineResidues,
-            LineLagCensus lineLags) {
+            LineLagCensus lineLags,
+            LineLongCensus lineLongs) {
         long a = sequence.canonicalCounts().getOrDefault('A', 0L);
         long t = sequence.canonicalCounts().getOrDefault('T', 0L);
-        md.append("1. **R1 Line leftover lag.** Lines ").append(lineLags.lines())
-                .append(" nearAt ").append(lineLags.nearAt())
+        md.append("1. **R1 Line leftover long.** Lines ").append(lineLongs.lines())
+                .append(" nearAt ").append(lineLongs.nearAt())
                 .append(" shareNear ")
-                .append(String.format(Locale.ROOT, "%.4f", lineLags.shareAtNear()))
-                .append(" twins ").append(lineLags.twinGroups())
-                .append(" lag0 ").append(lineLags.lag0())
+                .append(String.format(Locale.ROOT, "%.4f", lineLongs.shareAtNear()))
+                .append(" twins ").append(lineLongs.twinGroups())
+                .append(" lagLong ").append(lineLongs.lagLong())
+                .append(" maxLag ").append(lineLongs.maxLag())
+                .append(" longShare ")
+                .append(String.format(Locale.ROOT, "%.4f", lineLongs.longShare()))
+                .append(" longTail ").append(lineLongs.longTail())
+                .append(".\n");
+        md.append("2. **R2 Line-lag remainder.** lag0 ").append(lineLags.lag0())
                 .append(" lag1 ").append(lineLags.lag1())
                 .append(" lag2 ").append(lineLags.lag2())
                 .append(" lagLong ").append(lineLags.lagLong())
                 .append(" modalLag ").append(lineLags.modalLag())
-                .append(".\n");
-        md.append("2. **R2 Line-residue remainder.** copies ").append(lineResidues.copyGroups())
+                .append("; copies ").append(lineResidues.copyGroups())
                 .append("/").append(lineResidues.copyLines())
                 .append(" forks ").append(lineResidues.forkGroups()).append("/").append(lineResidues.forkLines())
                 .append(" copyShare ")

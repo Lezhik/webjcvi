@@ -36,6 +36,7 @@ import org.webjcvi.majority.MajorityScan;
 import org.webjcvi.near.NearScan;
 import org.webjcvi.residue.ResidueScan;
 import org.webjcvi.dup.DupScan;
+import org.webjcvi.linger.LingerScan;
 import org.webjcvi.logs.LogAnalysisReport;
 import org.webjcvi.logs.LogAnalysisService;
 import org.webjcvi.report.DnaReport;
@@ -86,6 +87,7 @@ public class WorkspaceApiController {
     private final NearScan nears;
     private final ResidueScan residues;
     private final DupScan dups;
+    private final LingerScan lingers;
     private final LogAnalysisService logAnalysis;
 
     public WorkspaceApiController(
@@ -120,6 +122,7 @@ public class WorkspaceApiController {
             NearScan nears,
             ResidueScan residues,
             DupScan dups,
+            LingerScan lingers,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -152,6 +155,7 @@ public class WorkspaceApiController {
         this.nears = nears;
         this.residues = residues;
         this.dups = dups;
+        this.lingers = lingers;
         this.logAnalysis = logAnalysis;
     }
 
@@ -963,6 +967,32 @@ public class WorkspaceApiController {
                     body.put("minFork", scan.minFork());
                     body.put("topPrefix", scan.topPrefix());
                     body.put("topCount", scan.topCount());
+                    return body;
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/linger")
+    public Mono<Map<String, Object>> profileLingers(
+            @RequestParam("text") String text) {
+        return Mono.fromCallable(() -> {
+                    var scan = lingers.profile(text);
+                    Map<String, Object> body = new LinkedHashMap<>();
+                    body.put("lineCount", scan.lineCount());
+                    body.put("scanned", scan.scanned());
+                    body.put("floorLength", scan.floorLength());
+                    body.put("nearAt", scan.nearAt());
+                    body.put("twinGroups", scan.twinGroups());
+                    body.put("lag0", scan.lag0());
+                    body.put("lag1", scan.lag1());
+                    body.put("lag2", scan.lag2());
+                    body.put("lagLong", scan.lagLong());
+                    body.put("modalLag", scan.modalLag());
+                    body.put("maxLag", scan.maxLag());
+                    body.put("longShare", scan.longShare());
+                    body.put("longTail", scan.longTail());
+                    body.put("copyShare", scan.copyShare());
+                    body.put("mostlyCopies", scan.mostlyCopies());
                     return body;
                 })
                 .subscribeOn(Schedulers.boundedElastic());

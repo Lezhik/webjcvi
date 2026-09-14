@@ -60,6 +60,7 @@ import org.webjcvi.majority.MajorityException;
 import org.webjcvi.near.NearException;
 import org.webjcvi.residue.ResidueException;
 import org.webjcvi.dup.DupException;
+import org.webjcvi.linger.LingerException;
 import org.webjcvi.cliff.CliffScan;
 import org.webjcvi.runway.RunwayScan;
 import org.webjcvi.rise.RiseScan;
@@ -67,6 +68,7 @@ import org.webjcvi.majority.MajorityScan;
 import org.webjcvi.near.NearScan;
 import org.webjcvi.residue.ResidueScan;
 import org.webjcvi.dup.DupScan;
+import org.webjcvi.linger.LingerScan;
 import org.webjcvi.logs.LogAnalysisService;
 
 /**
@@ -108,6 +110,7 @@ public class WebJcviMcpTools {
     private final NearScan nears;
     private final ResidueScan residues;
     private final DupScan dups;
+    private final LingerScan lingers;
     private final LogAnalysisService logAnalysis;
 
     public WebJcviMcpTools(FileStorageService storage, DnaReportService reports) {
@@ -115,7 +118,7 @@ public class WebJcviMcpTools {
                 new WrapReflow(), new RareClassScanner(), new RareBreakTokenizer(), new KmerStamp(),
                 new PalindromeScan(), new StemLoop(), new FuzzyFind(), new BlockContrast(),
                 new MirrorJoint(), new SeamGuard(), new PhaseJoint(), new FrameFields(),
-                new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan(), new RunwayScan(), new RiseScan(), new MajorityScan(), new NearScan(), new ResidueScan(), new DupScan(), new LogAnalysisService());
+                new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan(), new RunwayScan(), new RiseScan(), new MajorityScan(), new NearScan(), new ResidueScan(), new DupScan(), new LingerScan(), new LogAnalysisService());
     }
 
     @Autowired
@@ -151,6 +154,7 @@ public class WebJcviMcpTools {
             NearScan nears,
             ResidueScan residues,
             DupScan dups,
+            LingerScan lingers,
             LogAnalysisService logAnalysis) {
         this.storage = storage;
         this.reports = reports;
@@ -183,6 +187,7 @@ public class WebJcviMcpTools {
         this.nears = nears;
         this.residues = residues;
         this.dups = dups;
+        this.lingers = lingers;
         this.logAnalysis = logAnalysis;
     }
 
@@ -763,6 +768,12 @@ public class WebJcviMcpTools {
         return run(() -> dups.profile(text).summary());
     }
 
+    @Tool(name = "profile_lingers", description = "Bin leftover colliding lines after the 0.90 near-unique width by splitLag. If longTail (lagLong greater than 0), leftover persists past DNA's two-base climb even when mostlyCopies. Not the DNA file and not a project path.")
+    public String profileLingers(
+            @ToolParam(description = "Arbitrary text to scan") String text) {
+        return run(() -> lingers.profile(text).summary());
+    }
+
     @Tool(name = "analyze_logs", description = "Analyze caller-supplied log text with the shared log-analysis facade. Returns a JSON report. Not the DNA file. Truncates at 524288 characters.")
     public String analyzeLogs(
             @ToolParam(description = "Log text to analyze") String text) {
@@ -794,7 +805,7 @@ public class WebJcviMcpTools {
             return action.execute();
         } catch (StorageException | TapeException | SegmentException | DriftException | ReflowException
                  | RareException | TokenException | StampException | FoldException | LoopException
-                 | FuzzyException | ContrastException | MirrorException | SeamException | PhaseException | FrameException | CloneException | PrefixException | KeyException | ForkException | AffixException | LaneException | RowException | CliffException | RunwayException | RiseException | MajorityException | NearException | ResidueException | DupException e) {
+                 | FuzzyException | ContrastException | MirrorException | SeamException | PhaseException | FrameException | CloneException | PrefixException | KeyException | ForkException | AffixException | LaneException | RowException | CliffException | RunwayException | RiseException | MajorityException | NearException | ResidueException | DupException | LingerException e) {
             return "Error: " + e.getMessage();
         }
     }

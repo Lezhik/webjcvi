@@ -34,6 +34,7 @@ import org.webjcvi.majority.MajorityScan;
 import org.webjcvi.near.NearScan;
 import org.webjcvi.residue.ResidueScan;
 import org.webjcvi.dup.DupScan;
+import org.webjcvi.linger.LingerScan;
 
 /**
  * Fixed-API facade over the text-processing algorithms for log analysis.
@@ -79,12 +80,13 @@ public final class LogAnalysisService {
     private final NearScan nears;
     private final ResidueScan residues;
     private final DupScan dups;
+    private final LingerScan lingers;
 
     public LogAnalysisService() {
         this(new BannerSplitter(), new PairDrift(), new WrapReflow(), new RareClassScanner(),
                 new RareBreakTokenizer(), new KmerStamp(), new PalindromeScan(), new StemLoop(),
                 new FuzzyFind(), new BlockContrast(), new MirrorJoint(), new SeamGuard(),
-                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan(), new RunwayScan(), new RiseScan(), new MajorityScan(), new NearScan(), new ResidueScan(), new DupScan());
+                new PhaseJoint(), new FrameFields(), new CloneScan(), new PrefixGroup(), new KeyWidth(), new ForkScan(), new AffixScan(), new LaneScan(), new RowScan(), new CliffScan(), new RunwayScan(), new RiseScan(), new MajorityScan(), new NearScan(), new ResidueScan(), new DupScan(), new LingerScan());
     }
 
     public LogAnalysisService(
@@ -115,7 +117,8 @@ public final class LogAnalysisService {
             MajorityScan majorities,
             NearScan nears,
             ResidueScan residues,
-            DupScan dups) {
+            DupScan dups,
+            LingerScan lingers) {
         this.splitter = splitter;
         this.drift = drift;
         this.reflow = reflow;
@@ -144,6 +147,7 @@ public final class LogAnalysisService {
         this.nears = nears;
         this.residues = residues;
         this.dups = dups;
+        this.lingers = lingers;
     }
 
     /**
@@ -450,6 +454,24 @@ public final class LogAnalysisService {
                 dupScan.topPrefix(),
                 dupScan.topCount());
 
+        var lingerScan = lingers.profile(payload);
+        var lingerSection = new LogAnalysisReport.LingerSection(
+                lingerScan.lineCount(),
+                lingerScan.scanned(),
+                lingerScan.floorLength(),
+                lingerScan.nearAt(),
+                lingerScan.twinGroups(),
+                lingerScan.lag0(),
+                lingerScan.lag1(),
+                lingerScan.lag2(),
+                lingerScan.lagLong(),
+                lingerScan.modalLag(),
+                lingerScan.maxLag(),
+                lingerScan.longShare(),
+                lingerScan.longTail(),
+                lingerScan.copyShare(),
+                lingerScan.mostlyCopies());
+
         LogAnalysisReport report = new LogAnalysisReport(
                 API_VERSION,
                 inputLength,
@@ -482,9 +504,10 @@ public final class LogAnalysisService {
                 majoritySection,
                 nearSection,
                 residueSection,
-                dupSection);
+                dupSection,
+                lingerSection);
         if (log.isDebugEnabled()) {
-            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={} affixes={} lanes={} rows={} cliffs={} runways={} rises={} majorities={} nears={} residues={} dups={}",
+            log.debug("log-analysis.done truncated={} tapeRuns={} banners={} hotspots={} tokens={} stamps={} palindromes={} spans={} fuzzyHits={} stutters={} mirrors={} seams={} phase={} fields={} clones={} prefixes={} keys={} forks={} affixes={} lanes={} rows={} cliffs={} runways={} rises={} majorities={} nears={} residues={} dups={} lingers={}",
                     truncated,
                     tapeSection.runCount(),
                     bannerSection.sectionCount(),
@@ -512,7 +535,8 @@ public final class LogAnalysisService {
                     majoritySection.majorityAt(),
                     nearSection.nearAt(),
                     residueSection.twinGroups(),
-                    dupSection.copyGroups());
+                    dupSection.copyGroups(),
+                    lingerSection.lagLong());
         }
         return report;
     }
